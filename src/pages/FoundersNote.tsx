@@ -59,7 +59,7 @@ export default function FoundersNote() {
       </nav>
 
       {/* Letter */}
-      <main style={{ maxWidth: "680px", margin: "0 auto", padding: "6rem 2.5rem 8rem" }}>
+      <main style={{ maxWidth: "920px", margin: "0 auto", padding: "5rem 2.5rem 7rem" }}>
 
         <p style={{
           fontFamily: font.sans,

@@ -234,6 +234,93 @@ function RankAlert() {
   );
 }
 
+/* ─── Rank tooltip ───────────────────────────────── */
+function RankTooltip() {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      <span style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: "15px", height: "15px", borderRadius: "50%",
+        border: `1px solid ${C.borderMid}`, cursor: "default",
+        fontFamily: font.sans, fontSize: "0.65rem", fontWeight: 700,
+        color: C.inkFaint, lineHeight: 1, flexShrink: 0,
+      }}>?</span>
+      {visible && (
+        <div style={{
+          position: "absolute", bottom: "calc(100% + 8px)", left: "50%",
+          transform: "translateX(-50%)",
+          background: C.ink, color: C.white,
+          fontFamily: font.sans, fontSize: "0.75rem", lineHeight: 1.6,
+          padding: "0.75rem 1rem", borderRadius: "10px",
+          width: "260px", zIndex: 10, pointerEvents: "none",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+        }}>
+          <p style={{ margin: "0 0 0.5rem", fontWeight: 600, color: C.white }}>How this is calculated</p>
+          <p style={{ margin: "0 0 0.5rem", color: "rgba(255,255,255,0.8)" }}>
+            In 2022, BITS released official rank vs. marks data — the only year this was made public. We fit a skew-normal curve to that distribution.
+          </p>
+          <p style={{ margin: 0, color: "rgba(255,255,255,0.8)" }}>
+            Since 2025 scores use a different scale, we mapped them using a linear regression across 14 paired Pilani cutoffs (2022 and 2025), then looked up your score on the fitted curve.
+          </p>
+          <div style={{
+            position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
+            width: 0, height: 0,
+            borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+            borderTop: `6px solid ${C.ink}`,
+          }} />
+        </div>
+      )}
+    </span>
+  );
+}
+
+/* ─── Percentile tooltip ─────────────────────────── */
+function PercentileTooltip() {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      <span style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: "15px", height: "15px", borderRadius: "50%",
+        border: `1px solid ${C.borderMid}`, cursor: "default",
+        fontFamily: font.sans, fontSize: "0.65rem", fontWeight: 700,
+        color: C.inkFaint, lineHeight: 1, flexShrink: 0,
+      }}>?</span>
+      {visible && (
+        <div style={{
+          position: "absolute", bottom: "calc(100% + 8px)", left: "50%",
+          transform: "translateX(-50%)",
+          background: C.ink, color: C.white,
+          fontFamily: font.sans, fontSize: "0.75rem", lineHeight: 1.6,
+          padding: "0.75rem 1rem", borderRadius: "10px",
+          width: "240px", zIndex: 10, pointerEvents: "none",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+        }}>
+          <p style={{ margin: "0 0 0.5rem", fontWeight: 600, color: C.white }}>How this is calculated</p>
+          <p style={{ margin: 0, color: "rgba(255,255,255,0.8)" }}>
+            Derived from the same 2022 rank distribution as the estimated rank. Shows what fraction of all test-takers scored strictly below your mark.
+          </p>
+          <div style={{
+            position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
+            width: 0, height: 0,
+            borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+            borderTop: `6px solid ${C.ink}`,
+          }} />
+        </div>
+      )}
+    </span>
+  );
+}
+
 /* ─── Props ──────────────────────────────────────── */
 interface Props {
   finalScore: number | null;
@@ -319,8 +406,7 @@ export default function StatsSection({
   return (
     <div
       style={{
-        borderTop: `1px solid ${C.border}`,
-        paddingTop: "3rem",
+        paddingTop: "0",
         marginBottom: "3rem",
       }}
     >
@@ -332,19 +418,78 @@ export default function StatsSection({
         }
       `}</style>
 
-      <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Your numbers</p>
-      <h2
-        style={{
-          fontFamily: font.serif,
-          fontSize: "1.7rem",
-          color: C.ink,
-          fontWeight: 400,
-          margin: "0 0 2rem",
-        }}
-      >
-        How you stack up
-      </h2>
+      {/* ── College — full width row ───────────────── */}
+      <div style={{ marginBottom: "1.25rem" }}>
+        <div
+          style={{
+            background: C.white,
+            border: `1px solid ${C.border}`,
+            borderRadius: "16px",
+            padding: "2.25rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "2rem", flexWrap: "wrap" }}>
+            {/* Left: label + main content */}
+            <div style={{ flex: 1, minWidth: "200px" }}>
+              <p style={{ ...eyebrow, marginBottom: "0.5rem" }}>Best match right now</p>
+              {finalScore === null ? (
+                <Skeleton />
+              ) : college ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                  <span style={{ fontFamily: font.serif, fontSize: "clamp(1.9rem, 3vw, 2.6rem)", color: C.ink, lineHeight: 1.1 }}>
+                    BITS {college.campus}
+                  </span>
+                  <span style={{ fontFamily: font.sans, fontSize: "1rem", color: C.inkMid, lineHeight: 1.4 }}>
+                    {college.degree} · {college.specialization}
+                  </span>
+                  {(() => {
+                    const diff = finalScore! - college.baseline2025;
+                    const likelihood =
+                      diff >= 5 ? { label: "Likely", bg: C.greenLight, border: C.greenBorder, text: C.green } :
+                      diff >= -4 ? { label: "Close", bg: "#fffbeb", border: "#fde68a", text: "#92400e" } :
+                      { label: "Reach", bg: "#fff1f2", border: "#fecdd3", text: "#991b1b" };
+                    return (
+                      <div style={{ display: "inline-flex", alignItems: "center", marginTop: "0.25rem", background: likelihood.bg, border: `1px solid ${likelihood.border}`, borderRadius: "6px", padding: "0.25rem 0.75rem", alignSelf: "flex-start" }}>
+                        <span style={{ fontFamily: font.sans, fontSize: "0.8rem", color: likelihood.text, fontWeight: 600 }}>
+                          {likelihood.label}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                  <span style={{ fontFamily: font.serif, fontSize: "clamp(1.9rem, 3vw, 2.6rem)", color: C.inkMid, lineHeight: 1.1 }}>
+                    No match yet
+                  </span>
+                  <span style={{ fontFamily: font.sans, fontSize: "0.92rem", color: C.inkFaint }}>
+                    Your score is below all current cutoffs. Cutoffs may shift for 2026.
+                  </span>
+                </div>
+              )}
+            </div>
 
+            {/* Right: cutoff metadata strip */}
+            {college && finalScore !== null && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "flex-end", flexShrink: 0 }}>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ fontFamily: font.sans, fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.inkFaint, margin: "0 0 0.2rem" }}>2025 cutoff</p>
+                  <p style={{ fontFamily: font.serif, fontSize: "1.6rem", color: C.ink, margin: 0, lineHeight: 1 }}>{college.baseline2025}</p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ fontFamily: font.sans, fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.inkFaint, margin: "0 0 0.2rem" }}>Your score</p>
+                  <p style={{ fontFamily: font.serif, fontSize: "1.6rem", color: C.rust, margin: 0, lineHeight: 1 }}>{finalScore}</p>
+                </div>
+                <p style={{ fontFamily: font.sans, fontSize: "0.75rem", color: C.inkFaint, margin: 0, textAlign: "right" }}>
+                  {usedPreference ? "From your saved preferences" : "Highest branch you clear"}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Four stats — two-by-two grid ──────────── */}
       <div
         style={{
           display: "grid",
@@ -352,107 +497,50 @@ export default function StatsSection({
           gap: "1.25rem",
         }}
       >
-        {/* ── College ───────────────────────────────── */}
-        <StatCard
-          eyebrowText="College"
-          title="Best match right now"
-          footer={
-            <p
-              style={{
-                fontFamily: font.sans,
-                fontSize: "0.78rem",
-                color: C.inkFaint,
-                margin: 0,
-                lineHeight: 1.6,
-              }}
-            >
-              {usedPreference
-                ? "From your saved preferences"
-                : "Highest branch you clear"}
-            </p>
-          }
-        >
-          {finalScore === null ? (
-            <Skeleton />
-          ) : college ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-              <span
-                style={{
-                  fontFamily: font.serif,
-                  fontSize: "1.65rem",
-                  color: C.ink,
-                  lineHeight: 1.15,
-                }}
-              >
-                BITS {college.campus}
-              </span>
-              <span
-                style={{
-                  fontFamily: font.sans,
-                  fontSize: "0.88rem",
-                  color: C.inkMid,
-                  lineHeight: 1.4,
-                }}
-              >
-                {college.degree} · {college.specialization}
-              </span>
-              {(() => {
-                const diff = finalScore! - college.baseline2025;
-                const likelihood =
-                  diff >= 5 ? { label: "Likely", bg: C.greenLight, border: C.greenBorder, text: C.green } :
-                  diff >= -4 ? { label: "Close", bg: "#fffbeb", border: "#fde68a", text: "#92400e" } :
-                  { label: "Reach", bg: "#fff1f2", border: "#fecdd3", text: "#991b1b" };
-                return (
-                  <div style={{ display: "inline-flex", alignItems: "center", marginTop: "0.25rem", background: likelihood.bg, border: `1px solid ${likelihood.border}`, borderRadius: "6px", padding: "0.2rem 0.6rem", alignSelf: "flex-start" }}>
-                    <span style={{ fontFamily: font.sans, fontSize: "0.75rem", color: likelihood.text, fontWeight: 600 }}>
-                      {likelihood.label}
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <span
-                style={{
-                  fontFamily: font.serif,
-                  fontSize: "1.65rem",
-                  color: C.inkMid,
-                  lineHeight: 1.15,
-                }}
-              >
-                No match yet
-              </span>
-              <span
-                style={{
-                  fontFamily: font.sans,
-                  fontSize: "0.85rem",
-                  color: C.inkFaint,
-                }}
-              >
-                Your score is below all current cutoffs. Cutoffs may shift for 2026.
-              </span>
-            </div>
-          )}
-        </StatCard>
-
         {/* ── Estimated Rank ────────────────────────── */}
         <StatCard
           eyebrowText="Estimated Rank"
           title="Across all BITSAT candidates"
           footer={
-            <span style={{ fontFamily: font.sans, fontSize: "0.72rem", color: C.inkFaint }}>
-              Modelled from 2022-2025 official rank data
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontFamily: font.sans, fontSize: "0.72rem", color: C.inkFaint }}>
+                Modelled from 2022–2025 official rank data
+              </span>
+              <RankTooltip />
+            </div>
           }
         >
           {popRank === null ? (
             <Skeleton />
           ) : (
             <BigStat
-              value={popRank}
+              value={popRank.toLocaleString("en-IN")}
               suffix=""
-              sub={`top ${popPct}% of ~2.3L candidates`}
+              sub="estimated rank"
+            />
+          )}
+        </StatCard>
+
+        {/* ── Overall Percentile ────────────────────── */}
+        <StatCard
+          eyebrowText="Overall Percentile"
+          title="Across all BITSAT candidates"
+          footer={
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontFamily: font.sans, fontSize: "0.72rem", color: C.inkFaint }}>
+                Fraction of candidates who scored below you
+              </span>
+              <PercentileTooltip />
+            </div>
+          }
+        >
+          {popPct === null ? (
+            <Skeleton />
+          ) : (
+            <BigStat
+              value={popPct}
+              suffix="th"
+              sub="percentile"
             />
           )}
         </StatCard>
@@ -473,16 +561,8 @@ export default function StatsSection({
           {stats.loading ? (
             <Skeleton />
           ) : stats.shiftScores.length < 2 ? (
-            <span
-              style={{
-                fontFamily: font.sans,
-                fontSize: "0.9rem",
-                color: C.inkFaint,
-              }}
-            >
-              {stats.shiftScores.length <= 1
-                ? "Not enough submissions from your shift yet."
-                : "Calculating…"}
+            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
+              Not enough submissions from your shift yet.
             </span>
           ) : (
             <BigStat
@@ -509,16 +589,8 @@ export default function StatsSection({
           {stats.loading ? (
             <Skeleton />
           ) : stats.centerScores.length < 2 ? (
-            <span
-              style={{
-                fontFamily: font.sans,
-                fontSize: "0.9rem",
-                color: C.inkFaint,
-              }}
-            >
-              {stats.centerScores.length <= 1
-                ? "Not enough submissions from your center yet."
-                : "Calculating…"}
+            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
+              Not enough submissions from your center yet.
             </span>
           ) : (
             <BigStat

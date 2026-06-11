@@ -335,20 +335,15 @@ function Home() {
           <Link to="/" style={{ display: "inline-block", lineHeight: 0 }}>
             <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "32px" }} />
           </Link>
-          <button onClick={signOut} style={ghostBtn}>Sign out</button>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <Link to="/founders-note" style={{ color: C.inkMid, fontSize: "0.85rem", textDecoration: "none", fontFamily: font.sans, borderBottom: `1px solid ${C.borderMid}`, paddingBottom: "1px" }}>
+              A note from the founders
+            </Link>
+            <button onClick={signOut} style={ghostBtn}>Sign out</button>
+          </div>
         </nav>
 
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "4rem 2.5rem" }}>
-          <div style={{ marginBottom: "3rem" }}>
-            <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Your results</p>
-            <h1 style={{ fontFamily: font.serif, fontSize: "clamp(2rem, 4vw, 3rem)", color: C.ink, fontWeight: 400, lineHeight: 1.15, margin: "0 0 0.5rem" }}>
-              {data.candidateName ? `Here's how you did, ${toTitleCase(data.candidateName).split(" ")[0]}` : "Here's how you did"}
-            </h1>
-            <p style={{ color: C.inkMid, fontSize: "0.95rem", margin: 0 }}>
-              {data.testDate && <span>{formatShift(data.testDate)}</span>}
-              {data.center && <span style={{ marginLeft: "1rem", paddingLeft: "1rem", borderLeft: `1px solid ${C.border}` }}>{data.center}</span>}
-            </p>
-          </div>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "3rem 2.5rem 4rem" }}>
 
           <StatsSection
             finalScore={data.finalScore}
@@ -356,6 +351,33 @@ function Home() {
             center={data.center}
             preferences={preferences}
           />
+
+          {/* ── Score distribution histogram placeholder ── */}
+          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "3rem", marginBottom: "4rem" }}>
+            <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Score distribution</p>
+            <h2 style={{ fontFamily: font.serif, fontSize: "1.7rem", color: C.ink, fontWeight: 400, margin: "0 0 2rem" }}>
+              Where you sit in the field
+            </h2>
+            <div style={{
+              background: C.white,
+              border: `1px solid ${C.border}`,
+              borderRadius: "16px",
+              height: "200px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "column",
+              gap: "0.5rem",
+            }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.inkFaint} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="13" width="4" height="8"/><rect x="9" y="9" width="4" height="12"/><rect x="16" y="5" width="4" height="16"/>
+                <line x1="2" y1="21" x2="22" y2="21"/>
+              </svg>
+              <p style={{ fontFamily: font.sans, fontSize: "0.85rem", color: C.inkFaint, margin: 0 }}>
+                Histogram coming once enough data is in
+              </p>
+            </div>
+          </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "4rem" }}>
             <ScoreCard label="Session 1" value={data.session1Score} />
@@ -395,6 +417,22 @@ function Home() {
               <AnalyticsCard title="Score Distribution" subtitle="See where your score sits across all shifts combined." illustration={<ScoreDistributionIllustration />} />
             </div>
           </div>
+
+          {/* ── Candidate metadata — very end ─────────── */}
+          {(data.candidateName || data.testDate || data.center) && (
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "2rem", display: "flex", alignItems: "baseline", gap: "1rem", flexWrap: "wrap" }}>
+              {data.candidateName && (
+                <p style={{ fontFamily: font.serif, fontSize: "1rem", color: C.inkFaint, fontWeight: 400, margin: 0 }}>
+                  {toTitleCase(data.candidateName)}
+                </p>
+              )}
+              <p style={{ color: C.inkFaint, fontSize: "0.82rem", margin: 0, display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                {data.testDate && <span>{formatShift(data.testDate)}</span>}
+                {data.center && <span style={{ paddingLeft: "0.6rem", borderLeft: `1px solid ${C.border}` }}>{data.center}</span>}
+              </p>
+            </div>
+          )}
+
         </div>
       </div>
     );
