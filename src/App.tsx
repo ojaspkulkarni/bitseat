@@ -154,7 +154,23 @@ function Home() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    const channel = supabase
+      .channel("app-scores-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "scores" },
+        async () => {
+          const { data: authData } = await supabase.auth.getUser();
+          const currentUser = authData.user;
+          if (currentUser) await loadExistingScore(currentUser);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   async function loadExistingScore(currentUser: any) {
@@ -250,20 +266,9 @@ function Home() {
       if (fetchError) throw fetchError;
 
       if (existing) {
-        setData({
-          candidateName: existing.candidate_name,
-          applicationNumber: existing.application_number,
-          testDate: existing.test_date,
-          center: existing.center,
-          session1Score: existing.session1_score,
-          session2Score: existing.session2_score,
-          finalScore: existing.final_score,
-          rawText: "",
-        });
+        setData(parsed);
         const loaded = await loadPreferences(user.id);
-        if (loaded && loaded.length > 0) {
-          setPrefConfirmed(true);
-        }
+        if (loaded && loaded.length > 0) setPrefConfirmed(true);
         return;
       }
 
@@ -350,6 +355,7 @@ function Home() {
             testDate={data.testDate}
             center={data.center}
             preferences={preferences}
+            userId={user?.id ?? null}
           />
 
           {/* ── Score distribution histogram placeholder ── */}

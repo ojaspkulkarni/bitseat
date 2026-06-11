@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { BRANCHES, type Branch, estimatedRank, estimatedPercentile } from "../data/cutoffs";
+import { type Branch, estimatedRank, estimatedPercentile } from "../data/cutoffs";
 import { C, font, eyebrow } from "./stats.tokens";
 import { StatCard, BigStat, Skeleton, ThinDataNote, RankTooltip, PercentileTooltip } from "./stats.primitives";
 import { ScoreHistogram } from "./ScoreHistogram";
@@ -27,10 +27,7 @@ function predictCollege(score: number, preferences: Branch[]): Branch | null {
   for (const pref of preferences) {
     if (score >= pref.baseline2025) return pref;
   }
-  const cleared = BRANCHES.filter((b) => score >= b.baseline2025).sort(
-    (a, b) => b.baseline2025 - a.baseline2025
-  );
-  return cleared[0] ?? null;
+  return null;
 }
 
 /* ─── Types ──────────────────────────────────────── */
@@ -39,6 +36,7 @@ interface Props {
   testDate: string | null;
   center: string | null;
   preferences: Branch[];
+  userId: string | null;
 }
 
 interface StatsState {
@@ -47,34 +45,50 @@ interface StatsState {
   shiftScores: number[];
   centerScores: number[];
   prefUpsets: PrefUpset[];
+  referralCount: number;
+  otherShiftScoresByShift: Record<string, number[]>;
 }
 
 /* ─── Main component ─────────────────────────────── */
-export default function StatsSection({ finalScore, testDate, center, preferences }: Props) {
+export default function StatsSection({ finalScore, testDate, center, preferences, userId }: Props) {
   const [stats, setStats] = useState<StatsState>({
     loading: true,
     allScores: [],
     shiftScores: [],
     centerScores: [],
     prefUpsets: [],
+    referralCount: 0,
+    otherShiftScoresByShift: {},
   });
 
   useEffect(() => {
     if (finalScore === null) return;
     loadStats();
+
+    const channel = supabase
+      .channel("stats-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "scores" },
+        () => { loadStats(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [finalScore, testDate, center]);
 
   async function loadStats() {
     setStats((s) => ({ ...s, loading: true }));
 
-    const [scoresRes, prefsRes] = await Promise.all([
+    const [scoresRes, prefsRes, referralsRes] = await Promise.all([
       supabase.from("scores").select("final_score, test_date, center, user_id"),
       supabase.from("preferences").select("branch_keys, user_id"),
+      supabase.from("referrals").select("share_clicks").eq("user_id", userId ?? "").maybeSingle(),
     ]);
 
     const rows = scoresRes.data;
     if (scoresRes.error || !rows) {
-      setStats({ loading: false, allScores: [], shiftScores: [], centerScores: [], prefUpsets: [] });
+      setStats({ loading: false, allScores: [], shiftScores: [], centerScores: [], prefUpsets: [], referralCount: 0, otherShiftScoresByShift: {} });
       return;
     }
 
@@ -93,9 +107,21 @@ export default function StatsSection({ finalScore, testDate, center, preferences
       .map((r: any) => r.final_score as number)
       .filter((s) => typeof s === "number");
 
-    const prefUpsets = computePrefUpsets(prefsRes.data ?? [], rows);
+    // Build per-shift map excluding the user's own shift
+    const otherShiftScoresByShift: Record<string, number[]> = {};
+    for (const r of rows) {
+      if (!r.test_date || r.test_date === testDate) continue;
+      if (typeof r.final_score !== "number") continue;
+      if (!otherShiftScoresByShift[r.test_date]) {
+        otherShiftScoresByShift[r.test_date] = [];
+      }
+      otherShiftScoresByShift[r.test_date].push(r.final_score);
+    }
 
-    setStats({ loading: false, allScores, shiftScores, centerScores, prefUpsets });
+    const prefUpsets = computePrefUpsets(prefsRes.data ?? [], rows);
+    const referralCount = referralsRes.data?.share_clicks ?? 0;
+
+    setStats({ loading: false, allScores, shiftScores, centerScores, prefUpsets, referralCount, otherShiftScoresByShift });
   }
 
   const score = finalScore ?? 0;
@@ -157,7 +183,7 @@ export default function StatsSection({ finalScore, testDate, center, preferences
                     No match yet
                   </span>
                   <span style={{ fontFamily: font.sans, fontSize: "0.92rem", color: C.inkFaint }}>
-                    Your score is below all current cutoffs. Cutoffs may shift for 2026.
+                    None of your saved preferences are cleared at this score. Update your preferences or check back as cutoffs shift for 2026.
                   </span>
                 </div>
               )}
@@ -262,7 +288,15 @@ export default function StatsSection({ finalScore, testDate, center, preferences
           <p style={{ fontFamily: font.sans, fontSize: "0.82rem", fontWeight: 600, color: C.inkMid, margin: "0 0 1.25rem", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
             Where Bitseat users scored
           </p>
-          <ScoreHistogram allScores={stats.allScores} myScore={finalScore} loading={stats.loading} />
+          <ScoreHistogram
+            allScores={stats.allScores}
+            shiftScores={stats.shiftScores}
+            otherShiftScoresByShift={stats.otherShiftScoresByShift}
+            myScore={finalScore}
+            loading={stats.loading}
+            shareClicks={stats.referralCount}
+            shareUrl={`${window.location.origin}/r/${userId ?? ""}`}
+          />
         </div>
       </div>
 
