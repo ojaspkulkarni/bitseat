@@ -117,6 +117,7 @@ function Home() {
   const [preferences, setPreferences] = useState<Branch[]>([]);
   // Whether the user has explicitly confirmed their preferences (seen the setup screen)
   const [prefConfirmed, setPrefConfirmed] = useState(false);
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0);
 
   const view: AppView = loading
     ? "loading"
@@ -154,7 +155,23 @@ function Home() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    const channel = supabase
+      .channel("app-scores-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "scores" },
+        async () => {
+          const { data: authData } = await supabase.auth.getUser();
+          const currentUser = authData.user;
+          if (currentUser) await loadExistingScore(currentUser);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   async function loadExistingScore(currentUser: any) {
@@ -250,6 +267,7 @@ function Home() {
       if (fetchError) throw fetchError;
 
       if (existing) {
+        // Use the authoritative DB row, not the freshly-parsed PDF, so data is never stale
         setData({
           candidateName: existing.candidate_name,
           applicationNumber: existing.application_number,
@@ -260,10 +278,9 @@ function Home() {
           finalScore: existing.final_score,
           rawText: "",
         });
+        setStatsRefreshKey((k) => k + 1);
         const loaded = await loadPreferences(user.id);
-        if (loaded && loaded.length > 0) {
-          setPrefConfirmed(true);
-        }
+        if (loaded && loaded.length > 0) setPrefConfirmed(true);
         return;
       }
 
@@ -279,6 +296,7 @@ function Home() {
       });
       if (insertError) throw insertError;
       setData(parsed);
+      setStatsRefreshKey((k) => k + 1);
       // New upload → always show preference setup
       setPrefConfirmed(false);
     } catch (err) {
@@ -335,26 +353,28 @@ function Home() {
           <Link to="/" style={{ display: "inline-block", lineHeight: 0 }}>
             <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "32px" }} />
           </Link>
-          <button onClick={signOut} style={ghostBtn}>Sign out</button>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <Link to="/founders-note" style={{ color: C.inkMid, fontSize: "0.85rem", textDecoration: "none", fontFamily: font.sans, borderBottom: `1px solid ${C.borderMid}`, paddingBottom: "1px" }}>
+              A note from the founders
+            </Link>
+            <label style={{ ...ghostBtn, cursor: "pointer", position: "relative" as const }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload new PDF
+              <input type="file" accept=".pdf" onChange={handleFileChange} style={{ display: "none" }} />
+            </label>
+            <button onClick={signOut} style={ghostBtn}>Sign out</button>
+          </div>
         </nav>
 
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "4rem 2.5rem" }}>
-          <div style={{ marginBottom: "3rem" }}>
-            <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Your results</p>
-            <h1 style={{ fontFamily: font.serif, fontSize: "clamp(2rem, 4vw, 3rem)", color: C.ink, fontWeight: 400, lineHeight: 1.15, margin: "0 0 0.5rem" }}>
-              {data.candidateName ? `Here's how you did, ${toTitleCase(data.candidateName).split(" ")[0]}` : "Here's how you did"}
-            </h1>
-            <p style={{ color: C.inkMid, fontSize: "0.95rem", margin: 0 }}>
-              {data.testDate && <span>{formatShift(data.testDate)}</span>}
-              {data.center && <span style={{ marginLeft: "1rem", paddingLeft: "1rem", borderLeft: `1px solid ${C.border}` }}>{data.center}</span>}
-            </p>
-          </div>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "3rem 2.5rem 4rem" }}>
 
           <StatsSection
             finalScore={data.finalScore}
             testDate={data.testDate}
             center={data.center}
             preferences={preferences}
+            userId={user?.id ?? null}
+            refreshKey={statsRefreshKey}
           />
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "4rem" }}>
@@ -395,6 +415,22 @@ function Home() {
               <AnalyticsCard title="Score Distribution" subtitle="See where your score sits across all shifts combined." illustration={<ScoreDistributionIllustration />} />
             </div>
           </div>
+
+          {/* ── Candidate metadata — very end ─────────── */}
+          {(data.candidateName || data.testDate || data.center) && (
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "2rem", display: "flex", alignItems: "baseline", gap: "1rem", flexWrap: "wrap" }}>
+              {data.candidateName && (
+                <p style={{ fontFamily: font.serif, fontSize: "1rem", color: C.inkFaint, fontWeight: 400, margin: 0 }}>
+                  {toTitleCase(data.candidateName)}
+                </p>
+              )}
+              <p style={{ color: C.inkFaint, fontSize: "0.82rem", margin: 0, display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                {data.testDate && <span>{formatShift(data.testDate)}</span>}
+                {data.center && <span style={{ paddingLeft: "0.6rem", borderLeft: `1px solid ${C.border}` }}>{data.center}</span>}
+              </p>
+            </div>
+          )}
+
         </div>
       </div>
     );

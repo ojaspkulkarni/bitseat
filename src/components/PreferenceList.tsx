@@ -114,6 +114,20 @@ export default function PreferenceList({ finalScore, savedPreferences, onPrefere
     setDragOverIndex(null);
   }
 
+  function handleMoveUp(index: number) {
+    if (index === 0) return;
+    const next = [...preferences];
+    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+    update(next);
+  }
+
+  function handleMoveDown(index: number) {
+    if (index === preferences.length - 1) return;
+    const next = [...preferences];
+    [next[index], next[index + 1]] = [next[index + 1], next[index]];
+    update(next);
+  }
+
   const campusBranches = BRANCHES.filter((b) => b.campus === activeTab);
   const addedKeys = new Set(preferences.map(branchKey));
 
@@ -279,9 +293,9 @@ export default function PreferenceList({ finalScore, savedPreferences, onPrefere
                     onDragEnd={handleDragEnd}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1.5rem 2rem 1fr auto auto",
+                      gridTemplateColumns: "1.5rem 2rem 1fr auto auto auto auto",
                       alignItems: "center",
-                      gap: "0.6rem",
+                      gap: "0.4rem",
                       padding: "0.85rem 1rem",
                       borderRadius: "12px",
                       background: isDragOver ? C.rustLight : C.white,
@@ -313,7 +327,7 @@ export default function PreferenceList({ finalScore, savedPreferences, onPrefere
                     </div>
 
                     {/* Status badge */}
-                    {cfg && (
+                    {cfg ? (
                       <span style={{
                         padding: "0.2rem 0.55rem",
                         borderRadius: "20px",
@@ -326,24 +340,57 @@ export default function PreferenceList({ finalScore, savedPreferences, onPrefere
                       }}>
                         {cfg.label}
                       </span>
-                    )}
+                    ) : <span />}
+
+                    {/* Move up */}
+                    <button
+                      onClick={() => handleMoveUp(i)}
+                      title="Move up"
+                      disabled={i === 0}
+                      style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: "24px", height: "24px", borderRadius: "6px",
+                        border: `1px solid ${C.border}`, background: "transparent",
+                        color: i === 0 ? C.inkFaint : C.inkMid,
+                        cursor: i === 0 ? "default" : "pointer",
+                        opacity: i === 0 ? 0.35 : 1,
+                        padding: 0,
+                      }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 19V5M5 12l7-7 7 7"/>
+                      </svg>
+                    </button>
+
+                    {/* Move down */}
+                    <button
+                      onClick={() => handleMoveDown(i)}
+                      title="Move down"
+                      disabled={i === preferences.length - 1}
+                      style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: "24px", height: "24px", borderRadius: "6px",
+                        border: `1px solid ${C.border}`, background: "transparent",
+                        color: i === preferences.length - 1 ? C.inkFaint : C.inkMid,
+                        cursor: i === preferences.length - 1 ? "default" : "pointer",
+                        opacity: i === preferences.length - 1 ? 0.35 : 1,
+                        padding: 0,
+                      }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 5v14M5 12l7 7 7-7"/>
+                      </svg>
+                    </button>
 
                     {/* Remove */}
                     <button
                       onClick={() => handleRemove(i)}
                       title="Remove"
                       style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: "24px",
-                        height: "24px",
-                        borderRadius: "6px",
-                        border: `1px solid ${C.border}`,
-                        background: "transparent",
-                        color: "#BE123C",
-                        cursor: "pointer",
-                        padding: 0,
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: "24px", height: "24px", borderRadius: "6px",
+                        border: `1px solid ${C.border}`, background: "transparent",
+                        color: "#BE123C", cursor: "pointer", padding: 0,
                       }}
                     >
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

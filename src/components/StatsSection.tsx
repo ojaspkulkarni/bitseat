@@ -1,224 +1,43 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { BRANCHES, type Branch, estimatedRank, estimatedPercentile } from "../data/cutoffs";
+import { type Branch, estimatedRank, estimatedPercentile } from "../data/cutoffs";
+import { C, font, eyebrow } from "./stats.tokens";
+import { StatCard, BigStat, Skeleton, ThinDataNote, RankTooltip, PercentileTooltip } from "./stats.primitives";
+import { ScoreHistogram } from "./ScoreHistogram";
+import { HotBranches, computePrefUpsets, type PrefUpset } from "./HotBranches";
 
-/* ─── Design tokens (mirrored from App) ─────────── */
-const C = {
-  cream: "#faf9f5",
-  rust: "#d77656",
-  rustLight: "#f9ede7",
-  rustDark: "#b85e3e",
-  green: "#166534",
-  greenLight: "#f0fdf4",
-  greenBorder: "#bbf7d0",
-  ink: "#1C1612",
-  inkMid: "#5A4E44",
-  inkFaint: "#9A8E85",
-  white: "#FFFFFF",
-  border: "rgba(92,70,55,0.12)",
-  borderMid: "rgba(92,70,55,0.20)",
-};
-
-const font = {
-  serif: "'EB Garamond', 'Garamond', 'Georgia', serif",
-  sans: "'Inter', ui-sans-serif, system-ui, sans-serif",
-};
-
-const eyebrow: React.CSSProperties = {
-  fontFamily: font.sans,
-  fontSize: "0.7rem",
-  fontWeight: 600,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase" as const,
-  color: C.rust,
-  margin: 0,
-};
-
-/* ─── Shift label formatter (mirrors App.tsx) ───────*/
+/* ─── Helpers ────────────────────────────────────── */
 function formatShift(raw: string): string {
   if (!raw) return raw;
   const match = raw.match(/^(\d{1,2})([A-Za-z]+)(\d{4})(?:_S(\d))?/);
   if (match) {
     const [, day, month, year, session] = match;
-    const sessionPart = session ? ` · Session ${session}` : "";
-    return `${day} ${month} ${year}${sessionPart}`;
+    return `${day} ${month} ${year}${session ? ` · Session ${session}` : ""}`;
   }
   return raw.replace(/_/g, " · ");
 }
 
-/* ─── Percentile math ────────────────────────────── */
-// "What fraction of scores is strictly below mine?"
-// Using the standard definition: percentile = (below / total) * 100
 function computePercentile(myScore: number, allScores: number[]): number {
   if (allScores.length === 0) return 0;
   const below = allScores.filter((s) => s < myScore).length;
   return Math.round((below / allScores.length) * 100);
 }
 
-/* ─── College prediction ─────────────────────────── */
-// Walk preferences first (in order), then fall back to highest cutoff
-// branch the user clears from all branches.
-function predictCollege(
-  score: number,
-  preferences: Branch[]
-): Branch | null {
-  // Try preferences in order
+function predictCollege(score: number, preferences: Branch[]): Branch | null {
   for (const pref of preferences) {
     if (score >= pref.baseline2025) return pref;
   }
-  // Fall back: highest cutoff branch the score clears
-  const cleared = BRANCHES.filter((b) => score >= b.baseline2025).sort(
-    (a, b) => b.baseline2025 - a.baseline2025
-  );
-  return cleared[0] ?? null;
+  return null;
 }
 
-/* ─── Stat card shell ────────────────────────────── */
-function StatCard({
-  eyebrowText,
-  title,
-  children,
-  footer,
-}: {
-  eyebrowText: string;
-  title: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-}) {
-  return (
-    <div
-      style={{
-        background: C.white,
-        border: `1px solid ${C.border}`,
-        borderRadius: "16px",
-        padding: "2.25rem",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.75rem",
-      }}
-    >
-      <p style={{ ...eyebrow, marginBottom: 0 }}>{eyebrowText}</p>
-      <p
-        style={{
-          fontFamily: font.sans,
-          fontSize: "0.82rem",
-          fontWeight: 600,
-          color: C.inkMid,
-          margin: 0,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-        }}
-      >
-        {title}
-      </p>
-      <div style={{ flex: 1 }}>{children}</div>
-      {footer && (
-        <div
-          style={{
-            borderTop: `1px solid ${C.border}`,
-            paddingTop: "0.75rem",
-            marginTop: "0.25rem",
-          }}
-        >
-          {footer}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Big number display ─────────────────────────── */
-function BigStat({
-  value,
-  suffix,
-  sub,
-}: {
-  value: string | number;
-  suffix?: string;
-  sub?: string;
-}) {
-  return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: "0.3rem" }}>
-      <span
-        style={{
-          fontFamily: font.serif,
-          fontSize: "3.2rem",
-          fontWeight: 400,
-          color: C.ink,
-          lineHeight: 1,
-        }}
-      >
-        {value}
-      </span>
-      {suffix && (
-        <span
-          style={{
-            fontFamily: font.serif,
-            fontSize: "1.5rem",
-            color: C.inkMid,
-            lineHeight: 1,
-          }}
-        >
-          {suffix}
-        </span>
-      )}
-      {sub && (
-        <span
-          style={{
-            fontFamily: font.sans,
-            fontSize: "0.8rem",
-            color: C.inkFaint,
-            marginLeft: "0.5rem",
-          }}
-        >
-          {sub}
-        </span>
-      )}
-    </div>
-  );
-}
-
-//nice code, eh?
-/* ─── Skeleton shimmer ───────────────────────────── */
-function Skeleton() {
-  return (
-    <div
-      style={{
-        height: "3.2rem",
-        width: "8rem",
-        borderRadius: "8px",
-        background: `linear-gradient(90deg, ${C.rustLight} 0%, #f2ede6 50%, ${C.rustLight} 100%)`,
-        backgroundSize: "200% 100%",
-        animation: "shimmer 1.4s infinite",
-      }}
-    />
-  );
-}
-
-/* ─── Insufficient data notice ───────────────────── */
-function ThinDataNote({ count, context }: { count: number; context: string }) {
-  return (
-    <p
-      style={{
-        fontFamily: font.sans,
-        fontSize: "0.78rem",
-        color: C.inkFaint,
-        margin: 0,
-        lineHeight: 1.6,
-      }}
-    >
-      Based on {count} submission{count !== 1 ? "s" : ""} {context}. Will
-      sharpen as more people upload.
-    </p>
-  );
-}
-
-/* ─── Props ──────────────────────────────────────── */
+/* ─── Types ──────────────────────────────────────── */
 interface Props {
   finalScore: number | null;
   testDate: string | null;
   center: string | null;
   preferences: Branch[];
+  userId: string | null;
+  refreshKey?: number;
 }
 
 interface StatsState {
@@ -226,37 +45,51 @@ interface StatsState {
   allScores: number[];
   shiftScores: number[];
   centerScores: number[];
+  prefUpsets: PrefUpset[];
+  referralCount: number;
+  otherShiftScoresByShift: Record<string, number[]>;
 }
 
 /* ─── Main component ─────────────────────────────── */
-export default function StatsSection({
-  finalScore,
-  testDate,
-  center,
-  preferences,
-}: Props) {
+export default function StatsSection({ finalScore, testDate, center, preferences, userId, refreshKey = 0 }: Props) {
   const [stats, setStats] = useState<StatsState>({
     loading: true,
     allScores: [],
     shiftScores: [],
     centerScores: [],
+    prefUpsets: [],
+    referralCount: 0,
+    otherShiftScoresByShift: {},
   });
 
   useEffect(() => {
     if (finalScore === null) return;
     loadStats();
-  }, [finalScore, testDate, center]);
+
+    const channel = supabase
+      .channel("stats-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "scores" },
+        () => { loadStats(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [finalScore, testDate, center, refreshKey]);
 
   async function loadStats() {
     setStats((s) => ({ ...s, loading: true }));
 
-    // Fetch all final scores (no PII, just the number + metadata for grouping)
-    const { data: rows, error } = await supabase
-      .from("scores")
-      .select("final_score, test_date, center");
+    const [scoresRes, prefsRes, referralsRes] = await Promise.all([
+      supabase.from("scores").select("final_score, test_date, center, user_id"),
+      supabase.from("preferences").select("branch_keys, user_id"),
+      supabase.from("referrals").select("share_clicks").eq("user_id", userId ?? "").maybeSingle(),
+    ]);
 
-    if (error || !rows) {
-      setStats({ loading: false, allScores: [], shiftScores: [], centerScores: [] });
+    const rows = scoresRes.data;
+    if (scoresRes.error || !rows) {
+      setStats({ loading: false, allScores: [], shiftScores: [], centerScores: [], prefUpsets: [], referralCount: 0, otherShiftScoresByShift: {} });
       return;
     }
 
@@ -264,46 +97,46 @@ export default function StatsSection({
       .map((r: any) => r.final_score as number)
       .filter((s) => typeof s === "number");
 
-    // Shift match: same test_date string
     const shiftScores = rows
       .filter((r: any) => testDate && r.test_date === testDate)
       .map((r: any) => r.final_score as number)
       .filter((s) => typeof s === "number");
 
-    // Center match: same center string (case-insensitive trim)
     const normalise = (s: string | null) => (s ?? "").trim().toLowerCase();
     const centerScores = rows
-      .filter(
-        (r: any) =>
-          center && normalise(r.center) === normalise(center)
-      )
+      .filter((r: any) => center && normalise(r.center) === normalise(center))
       .map((r: any) => r.final_score as number)
       .filter((s) => typeof s === "number");
 
-    setStats({ loading: false, allScores, shiftScores, centerScores });
+    // Build per-shift map excluding the user's own shift
+    const otherShiftScoresByShift: Record<string, number[]> = {};
+    for (const r of rows) {
+      if (!r.test_date || r.test_date === testDate) continue;
+      if (typeof r.final_score !== "number") continue;
+      if (!otherShiftScoresByShift[r.test_date]) {
+        otherShiftScoresByShift[r.test_date] = [];
+      }
+      otherShiftScoresByShift[r.test_date].push(r.final_score);
+    }
+
+    const prefUpsets = computePrefUpsets(prefsRes.data ?? [], rows);
+    const referralCount = referralsRes.data?.share_clicks ?? 0;
+
+    setStats({ loading: false, allScores, shiftScores, centerScores, prefUpsets, referralCount, otherShiftScoresByShift });
   }
 
   const score = finalScore ?? 0;
   const college = finalScore !== null ? predictCollege(finalScore, preferences) : null;
-
   const popRank = finalScore !== null ? estimatedRank(finalScore) : null;
   const popPct  = finalScore !== null ? estimatedPercentile(finalScore) : null;
   const shiftPct = computePercentile(score, stats.shiftScores);
   const centerPct = computePercentile(score, stats.centerScores);
-
-  // Decide label for the "your best match" college card
-  const usedPreference =
-    college && preferences.some((p) => p.campus === college.campus && p.specialization === college.specialization);
+  const usedPreference = college && preferences.some(
+    (p) => p.campus === college.campus && p.specialization === college.specialization
+  );
 
   return (
-    <div
-      style={{
-        borderTop: `1px solid ${C.border}`,
-        paddingTop: "3rem",
-        marginBottom: "3rem",
-      }}
-    >
-      {/* Inject shimmer keyframes once */}
+    <div style={{ paddingTop: "0", marginBottom: "3rem" }}>
       <style>{`
         @keyframes shimmer {
           0% { background-position: 200% 0; }
@@ -311,202 +144,181 @@ export default function StatsSection({
         }
       `}</style>
 
-      <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Your numbers</p>
-      <h2
-        style={{
-          fontFamily: font.serif,
-          fontSize: "1.7rem",
-          color: C.ink,
-          fontWeight: 400,
-          margin: "0 0 2rem",
-        }}
-      >
-        How you stack up
-      </h2>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, 1fr)",
-          gap: "1.25rem",
-        }}
-      >
-        {/* ── College ───────────────────────────────── */}
-        <StatCard
-          eyebrowText="College"
-          title="Best match right now"
-          footer={
-            <p
-              style={{
-                fontFamily: font.sans,
-                fontSize: "0.78rem",
-                color: C.inkFaint,
-                margin: 0,
-                lineHeight: 1.6,
-              }}
-            >
-              {usedPreference
-                ? "From your saved preferences"
-                : "Highest branch you clear"}
-            </p>
-          }
-        >
-          {finalScore === null ? (
-            <Skeleton />
-          ) : college ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-              <span
-                style={{
-                  fontFamily: font.serif,
-                  fontSize: "1.65rem",
-                  color: C.ink,
-                  lineHeight: 1.15,
-                }}
-              >
-                BITS {college.campus}
-              </span>
-              <span
-                style={{
-                  fontFamily: font.sans,
-                  fontSize: "0.88rem",
-                  color: C.inkMid,
-                  lineHeight: 1.4,
-                }}
-              >
-                {college.degree} · {college.specialization}
-              </span>
-              {(() => {
-                const diff = finalScore! - college.baseline2025;
-                const likelihood =
-                  diff >= 5 ? { label: "Likely", bg: C.greenLight, border: C.greenBorder, text: C.green } :
-                  diff >= -4 ? { label: "Close", bg: "#fffbeb", border: "#fde68a", text: "#92400e" } :
-                  { label: "Reach", bg: "#fff1f2", border: "#fecdd3", text: "#991b1b" };
-                return (
-                  <div style={{ display: "inline-flex", alignItems: "center", marginTop: "0.25rem", background: likelihood.bg, border: `1px solid ${likelihood.border}`, borderRadius: "6px", padding: "0.2rem 0.6rem", alignSelf: "flex-start" }}>
-                    <span style={{ fontFamily: font.sans, fontSize: "0.75rem", color: likelihood.text, fontWeight: 600 }}>
-                      {likelihood.label}
-                    </span>
-                  </div>
-                );
-              })()}
+      {/* ── Best match ────────────────────────────── */}
+      <div style={{ marginBottom: "1.25rem" }}>
+        <div style={{
+          background: C.white, border: `1px solid ${C.border}`,
+          borderRadius: "16px", padding: "2.25rem",
+        }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "2rem", flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: "200px" }}>
+              <p style={{ ...eyebrow, marginBottom: "0.5rem" }}>Best match right now</p>
+              {finalScore === null ? (
+                <Skeleton />
+              ) : college ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                  <span style={{ fontFamily: font.serif, fontSize: "clamp(1.9rem, 3vw, 2.6rem)", color: C.ink, lineHeight: 1.1 }}>
+                    BITS {college.campus}
+                  </span>
+                  <span style={{ fontFamily: font.sans, fontSize: "1rem", color: C.inkMid, lineHeight: 1.4 }}>
+                    {college.degree} · {college.specialization}
+                  </span>
+                  {(() => {
+                    const diff = finalScore! - college.baseline2025;
+                    const likelihood =
+                      diff >= 5  ? { label: "Likely", bg: C.greenLight, border: C.greenBorder, text: C.green } :
+                      diff >= -4 ? { label: "Close",  bg: "#fffbeb",    border: "#fde68a",      text: "#92400e" } :
+                                   { label: "Reach",  bg: "#fff1f2",    border: "#fecdd3",      text: "#991b1b" };
+                    return (
+                      <div style={{ display: "inline-flex", alignItems: "center", marginTop: "0.25rem", background: likelihood.bg, border: `1px solid ${likelihood.border}`, borderRadius: "6px", padding: "0.25rem 0.75rem", alignSelf: "flex-start" }}>
+                        <span style={{ fontFamily: font.sans, fontSize: "0.8rem", color: likelihood.text, fontWeight: 600 }}>
+                          {likelihood.label}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                  <span style={{ fontFamily: font.serif, fontSize: "clamp(1.9rem, 3vw, 2.6rem)", color: C.inkMid, lineHeight: 1.1 }}>
+                    No match yet
+                  </span>
+                  <span style={{ fontFamily: font.sans, fontSize: "0.92rem", color: C.inkFaint }}>
+                    None of your saved preferences are cleared at this score. Update your preferences or check back as cutoffs shift for 2026.
+                  </span>
+                </div>
+              )}
             </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <span
-                style={{
-                  fontFamily: font.serif,
-                  fontSize: "1.65rem",
-                  color: C.inkMid,
-                  lineHeight: 1.15,
-                }}
-              >
-                No match yet
-              </span>
-              <span
-                style={{
-                  fontFamily: font.sans,
-                  fontSize: "0.85rem",
-                  color: C.inkFaint,
-                }}
-              >
-                Your score is below all current cutoffs. Cutoffs may shift for 2026.
-              </span>
-            </div>
-          )}
-        </StatCard>
 
-        {/* ── Estimated Rank ────────────────────────── */}
+            {college && finalScore !== null && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "flex-end", flexShrink: 0 }}>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ fontFamily: font.sans, fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.inkFaint, margin: "0 0 0.2rem" }}>2025 cutoff</p>
+                  <p style={{ fontFamily: font.serif, fontSize: "1.6rem", color: C.ink, margin: 0, lineHeight: 1 }}>{college.baseline2025}</p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ fontFamily: font.sans, fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.inkFaint, margin: "0 0 0.2rem" }}>Your score</p>
+                  <p style={{ fontFamily: font.serif, fontSize: "1.6rem", color: C.rust, margin: 0, lineHeight: 1 }}>{finalScore}</p>
+                </div>
+                <p style={{ fontFamily: font.sans, fontSize: "0.75rem", color: C.inkFaint, margin: 0, textAlign: "right" }}>
+                  {usedPreference ? "From your saved preferences" : "Highest branch you clear"}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── 2×2 stat grid ────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.25rem" }}>
         <StatCard
           eyebrowText="Estimated Rank"
           title="Across all BITSAT candidates"
           footer={
-            <span style={{ fontFamily: font.sans, fontSize: "0.72rem", color: C.inkFaint }}>
-              Modelled from 2022-2025 official rank data
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontFamily: font.sans, fontSize: "0.72rem", color: C.inkFaint }}>
+                Modelled from 2022–2025 official rank data
+              </span>
+              <RankTooltip />
+            </div>
           }
         >
-          {popRank === null ? (
-            <Skeleton />
-          ) : (
-            <BigStat
-              value={popRank}
-              suffix=""
-              sub={`top ${popPct}% of ~2.3L candidates`}
-            />
+          {popRank === null ? <Skeleton /> : (
+            <BigStat value={popRank.toLocaleString("en-IN")} suffix="" sub="estimated rank" />
           )}
         </StatCard>
 
-        {/* ── Shift Percentile ──────────────────────── */}
+        <StatCard
+          eyebrowText="Overall Percentile"
+          title="Across all BITSAT candidates"
+          footer={
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontFamily: font.sans, fontSize: "0.72rem", color: C.inkFaint }}>
+                Fraction of candidates who scored below you
+              </span>
+              <PercentileTooltip />
+            </div>
+          }
+        >
+          {popPct === null ? <Skeleton /> : (
+            <BigStat value={popPct} suffix="th" sub="percentile" />
+          )}
+        </StatCard>
+
         <StatCard
           eyebrowText="Shift Percentile"
           title={testDate ? formatShift(testDate) : "Your shift"}
           footer={
-            stats.loading ? null : stats.shiftScores.length >= 2 ? (
-              <ThinDataNote
-                count={stats.shiftScores.length}
-                context="in your shift"
-              />
-            ) : null
+            !stats.loading && stats.shiftScores.length >= 2
+              ? <ThinDataNote count={stats.shiftScores.length} context="in your shift" />
+              : null
           }
         >
-          {stats.loading ? (
-            <Skeleton />
-          ) : stats.shiftScores.length < 2 ? (
-            <span
-              style={{
-                fontFamily: font.sans,
-                fontSize: "0.9rem",
-                color: C.inkFaint,
-              }}
-            >
-              {stats.shiftScores.length <= 1
-                ? "Not enough submissions from your shift yet."
-                : "Calculating…"}
+          {stats.loading ? <Skeleton /> : stats.shiftScores.length < 2 ? (
+            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
+              Not enough submissions from your shift yet.
             </span>
           ) : (
-            <BigStat
-              value={shiftPct}
-              suffix="th"
-              sub={`of ${stats.shiftScores.length} in shift`}
-            />
+            <BigStat value={shiftPct} suffix="th" sub={`of ${stats.shiftScores.length} in shift`} />
           )}
         </StatCard>
 
-        {/* ── Center Percentile ─────────────────────── */}
         <StatCard
           eyebrowText="Center Percentile"
-          title={center ? center : "Your exam center"}
+          title={center ?? "Your exam center"}
           footer={
-            stats.loading ? null : stats.centerScores.length >= 2 ? (
-              <ThinDataNote
-                count={stats.centerScores.length}
-                context="from your center"
-              />
-            ) : null
+            !stats.loading && stats.centerScores.length >= 2
+              ? <ThinDataNote count={stats.centerScores.length} context="from your center" />
+              : null
           }
         >
-          {stats.loading ? (
-            <Skeleton />
-          ) : stats.centerScores.length < 2 ? (
-            <span
-              style={{
-                fontFamily: font.sans,
-                fontSize: "0.9rem",
-                color: C.inkFaint,
-              }}
-            >
-              {stats.centerScores.length <= 1
-                ? "Not enough submissions from your center yet."
-                : "Calculating…"}
+          {stats.loading ? <Skeleton /> : stats.centerScores.length < 2 ? (
+            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
+              Not enough submissions from your center yet.
             </span>
           ) : (
-            <BigStat
-              value={centerPct}
-              suffix="th"
-              sub={`of ${stats.centerScores.length} at center`}
-            />
+            <BigStat value={centerPct} suffix="th" sub={`of ${stats.centerScores.length} at center`} />
           )}
         </StatCard>
+      </div>
+
+      {/* ── Score Distribution ────────────────────── */}
+      <div style={{ marginTop: "1.25rem" }}>
+        <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "2.25rem" }}>
+          <p style={{ ...eyebrow, marginBottom: "0.35rem" }}>Score Distribution</p>
+          <p style={{ fontFamily: font.sans, fontSize: "0.82rem", fontWeight: 600, color: C.inkMid, margin: "0 0 1.25rem", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
+            Where Bitseat users scored
+          </p>
+          <ScoreHistogram
+            allScores={stats.allScores}
+            shiftScores={stats.shiftScores}
+            otherShiftScoresByShift={stats.otherShiftScoresByShift}
+            myScore={finalScore}
+            loading={stats.loading}
+            shareClicks={stats.referralCount}
+            shareUrl={`${window.location.origin}/r/${userId ?? ""}`}
+          />
+        </div>
+      </div>
+
+      {/* ── Hot Branches 2026 ────────────────────── */}
+      <div style={{ marginTop: "1.25rem" }}>
+        <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "2.25rem" }}>
+          <p style={{ ...eyebrow, marginBottom: "0.35rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <svg width="11" height="13" viewBox="0 0 11 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5.5 0C5.5 0 8.5 3 8.5 5.5C8.5 6.5 8 7.3 7.2 7.8C7.4 7.2 7.3 6.5 6.9 6C6.9 7.5 6 8.8 4.8 9.5C5 8.8 4.9 8 4.4 7.4C4 8 3.5 8.8 3.5 9.8C2.5 9 2 7.7 2 6.3C2 5.5 2.2 4.7 2.6 4C2.3 4.6 2.2 5.3 2.3 6C1.3 5.1 0.8 3.8 1 2.5C1 2.5 2.5 4 3 4.5C2.5 3 3.5 1 5.5 0Z" fill="#d77656"/>
+              <path d="M5.5 7C5.5 7 6.8 8.2 6.8 9.3C6.8 10.3 6.2 11 5.5 11C4.8 11 4.2 10.3 4.2 9.3C4.2 8.2 5.5 7 5.5 7Z" fill="#b85e3e"/>
+            </svg>
+            Hot Branches 2026
+          </p>
+          <p style={{ fontFamily: font.sans, fontSize: "0.82rem", fontWeight: 600, color: C.inkMid, margin: "0 0 0.35rem", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
+            Preference trends that defy 2025 cutoffs
+          </p>
+          <p style={{ fontFamily: font.sans, fontSize: "0.78rem", color: C.inkFaint, margin: "0 0 1.25rem", lineHeight: 1.6 }}>
+            Among users who clear both branches, these are pairs where people consistently rank the lower-cutoff branch first — signalling a shift in demand.
+          </p>
+          <HotBranches upsets={stats.prefUpsets} loading={stats.loading} />
+        </div>
       </div>
     </div>
   );
