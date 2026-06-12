@@ -400,7 +400,6 @@ function Home() {
             </Link>
             <div className="site-nav__actions">
               <ResultsNavMenu
-                onUpload={() => {}}
                 onEditPrefs={() => setPrefConfirmed(false)}
                 onSignOut={signOut}
                 handleFileChange={handleFileChange}
@@ -603,7 +602,6 @@ function UploadZone({ user, loading, error, onFileChange }: { user: any; loading
 
 /* ─── Results nav overflow menu ─────────────────── */
 function ResultsNavMenu({
-  onUpload,
   onEditPrefs,
   onSignOut,
   handleFileChange,
@@ -611,7 +609,6 @@ function ResultsNavMenu({
   activeScoreId,
   onSelect,
 }: {
-  onUpload: () => void;
   onEditPrefs: () => void;
   onSignOut: () => void;
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
