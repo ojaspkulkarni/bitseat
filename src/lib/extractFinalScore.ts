@@ -1,8 +1,6 @@
 import * as pdfjsLib from "pdfjs-dist";
-import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
-
 pdfjsLib.GlobalWorkerOptions.workerSrc =
-  pdfjsWorker;
+  `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 export interface ExtractedBitsatData {
   candidateName: string | null;
