@@ -4,7 +4,6 @@ import { type Branch, estimatedRank, estimatedPercentile } from "../data/cutoffs
 import { C, font, eyebrow } from "./stats.tokens";
 import { StatCard, BigStat, Skeleton, ThinDataNote, RankTooltip, PercentileTooltip } from "./stats.primitives";
 import { ScoreHistogram } from "./ScoreHistogram";
-import { ShiftDifficultyIndex, computeShiftDifficulty, type ShiftDifficultyRow } from "./ShiftDifficultyIndex";
 
 /* ─── Helpers ────────────────────────────────────── */
 function formatShift(raw: string): string {
@@ -50,7 +49,6 @@ interface StatsState {
   centerScores: number[];
   referralCount: number;
   otherShiftScoresByShift: Record<string, number[]>;
-  shiftDifficulty: ShiftDifficultyRow[];
 }
 
 /* ─── Main component ─────────────────────────────── */
@@ -62,7 +60,6 @@ export default function StatsSection({ finalScore, testDate, center, preferences
     centerScores: [],
     referralCount: 0,
     otherShiftScoresByShift: {},
-    shiftDifficulty: [],
   });
 
   useEffect(() => {
@@ -91,7 +88,7 @@ export default function StatsSection({ finalScore, testDate, center, preferences
 
     const rows = scoresRes.data;
     if (scoresRes.error || !rows) {
-      setStats({ loading: false, allScores: [], shiftScores: [], centerScores: [], referralCount: 0, otherShiftScoresByShift: {}, shiftDifficulty: [] });
+      setStats({ loading: false, allScores: [], shiftScores: [], centerScores: [], referralCount: 0, otherShiftScoresByShift: {}});
       return;
     }
 
@@ -122,9 +119,8 @@ export default function StatsSection({ finalScore, testDate, center, preferences
     }
 
     const referralCount = referralsRes.data?.share_clicks ?? 0;
-    const shiftDifficulty = computeShiftDifficulty(rows as any, testDate ?? null);
 
-    setStats({ loading: false, allScores, shiftScores, centerScores, referralCount, otherShiftScoresByShift, shiftDifficulty });
+    setStats({ loading: false, allScores, shiftScores, centerScores, referralCount, otherShiftScoresByShift});
   }
 
   const score = finalScore ?? 0;
@@ -300,20 +296,6 @@ export default function StatsSection({ finalScore, testDate, center, preferences
             shareClicks={stats.referralCount}
             shareUrl={`${window.location.origin}/r/${userId ?? ""}`}
           />
-        </div>
-      </div>
-
-      {/* ── Shift Difficulty Index ────────────────── */}
-      <div style={{ marginTop: "1.25rem" }}>
-        <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "2.25rem" }}>
-          <p style={{ ...eyebrow, marginBottom: "0.35rem" }}>Shift Difficulty Index</p>
-          <p style={{ fontFamily: font.sans, fontSize: "0.82rem", fontWeight: 600, color: C.inkMid, margin: "0 0 0.35rem", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
-            How each 2026 shift compares
-          </p>
-          <p style={{ fontFamily: font.sans, fontSize: "0.78rem", color: C.inkFaint, margin: "0 0 1.25rem", lineHeight: 1.6 }}>
-            Each submission contributes two data points — one per session sat. Scores are matched to their respective shift using the session dates on your scorecard.
-          </p>
-          <ShiftDifficultyIndex rows={stats.shiftDifficulty} loading={stats.loading} />
         </div>
       </div>
     </div>
