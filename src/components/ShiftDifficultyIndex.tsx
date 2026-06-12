@@ -26,15 +26,33 @@ export interface ShiftDifficultyRow {
   isYours: boolean;
 }
 
+// Derive the paired shift key: 25May2026_S1 <-> 25May2026_S2
+function pairedShift(key: string): string | null {
+  if (key.endsWith("_S1")) return key.slice(0, -3) + "_S2";
+  if (key.endsWith("_S2")) return key.slice(0, -3) + "_S1";
+  return null;
+}
+
 export function computeShiftDifficulty(
-  rows: { test_date: string | null; final_score: number | null }[],
+  rows: { test_date: string | null; session1_score: number | null; session2_score: number | null; final_score: number | null }[],
   myShift: string | null
 ): ShiftDifficultyRow[] {
   const scoresByShift: Record<string, number[]> = {};
+
   for (const r of rows) {
-    if (!r.test_date || typeof r.final_score !== "number") continue;
-    if (!scoresByShift[r.test_date]) scoresByShift[r.test_date] = [];
-    scoresByShift[r.test_date].push(r.final_score);
+    // Session 1 score → test_date shift
+    if (r.test_date && typeof r.session1_score === "number") {
+      if (!scoresByShift[r.test_date]) scoresByShift[r.test_date] = [];
+      scoresByShift[r.test_date].push(r.session1_score);
+    }
+    // Session 2 score → paired shift (same day, other session)
+    if (r.test_date && typeof r.session2_score === "number") {
+      const s2key = pairedShift(r.test_date);
+      if (s2key) {
+        if (!scoresByShift[s2key]) scoresByShift[s2key] = [];
+        scoresByShift[s2key].push(r.session2_score);
+      }
+    }
   }
 
   const avgOf = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -52,9 +70,10 @@ export function computeShiftDifficulty(
     const overallAvg = avgOf(eligible.map((r) => r.avg as number));
     for (const r of result) {
       if (r.count >= MIN_SAMPLE && r.avg !== null && overallAvg > 0) {
-        // Higher index = candidates scored higher relative to other shifts,
-        // i.e. the shift was comparatively easier.
-        r.index = Math.round((r.avg / overallAvg) * 100);
+        // Higher index = candidates scored LOWER relative to other shifts,
+        // i.e. the paper was comparatively harder.
+        // We use (overallAvg / shiftAvg) * 100 so harder shifts score > 100.
+        r.index = Math.round((overallAvg / r.avg) * 100);
       }
     }
   }
@@ -64,8 +83,8 @@ export function computeShiftDifficulty(
 
 function difficultyLabel(index: number | null): { label: string; color: string; bg: string; border: string } {
   if (index === null) return { label: "—", color: C.inkFaint, bg: C.cream, border: C.border };
-  if (index >= 103) return { label: "Easier", color: C.green, bg: C.greenLight, border: C.greenBorder };
-  if (index <= 97) return { label: "Harder", color: "#991b1b", bg: "#fff1f2", border: "#fecdd3" };
+  if (index >= 103) return { label: "Harder", color: "#991b1b", bg: "#fff1f2", border: "#fecdd3" };
+  if (index <= 97)  return { label: "Easier", color: C.green, bg: C.greenLight, border: C.greenBorder };
   return { label: "Average", color: C.inkMid, bg: C.cream, border: C.border };
 }
 
@@ -173,7 +192,7 @@ export function ShiftDifficultyIndex({ rows, loading }: Props) {
             );
           })}
           <p style={{ fontFamily: font.sans, fontSize: "0.75rem", color: C.inkFaint, margin: "0.5rem 0 0", lineHeight: 1.6 }}>
-            Index of 100 = average score across shifts with at least {MIN_SAMPLE} submissions. Higher means candidates in that shift scored higher on average — typically an easier paper. Shifts below the threshold are excluded until more data comes in.
+            Index of 100 = average difficulty across shifts with at least {MIN_SAMPLE} submissions. Higher means candidates in that shift scored lower on average — typically a harder paper. Shifts below the threshold are excluded until more data comes in.
           </p>
         </div>
       )}

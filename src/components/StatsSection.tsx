@@ -20,7 +20,10 @@ function formatShift(raw: string): string {
 function computePercentile(myScore: number, allScores: number[]): number {
   if (allScores.length === 0) return 0;
   const below = allScores.filter((s) => s < myScore).length;
-  return Math.round((below / allScores.length) * 100);
+  const raw = Math.round((below / allScores.length) * 100);
+  // With very few submissions it's possible to score "0th" (everyone ties or you're last).
+  // Show at least 1st so the display isn't meaninglessly confusing.
+  return Math.max(raw, 1);
 }
 
 function predictCollege(score: number, preferences: Branch[]): Branch | null {
@@ -82,7 +85,7 @@ export default function StatsSection({ finalScore, testDate, center, preferences
     setStats((s) => ({ ...s, loading: true }));
 
     const [scoresRes, referralsRes] = await Promise.all([
-      supabase.from("scores").select("final_score, test_date, center, user_id"),
+      supabase.from("scores").select("final_score, session1_score, session2_score, test_date, center, user_id"),
       supabase.from("referrals").select("share_clicks").eq("user_id", userId ?? "").maybeSingle(),
     ]);
 
@@ -119,7 +122,7 @@ export default function StatsSection({ finalScore, testDate, center, preferences
     }
 
     const referralCount = referralsRes.data?.share_clicks ?? 0;
-    const shiftDifficulty = computeShiftDifficulty(rows, testDate ?? null);
+    const shiftDifficulty = computeShiftDifficulty(rows as any, testDate ?? null);
 
     setStats({ loading: false, allScores, shiftScores, centerScores, referralCount, otherShiftScoresByShift, shiftDifficulty });
   }
@@ -308,7 +311,7 @@ export default function StatsSection({ finalScore, testDate, center, preferences
             How each 2026 shift compares
           </p>
           <p style={{ fontFamily: font.sans, fontSize: "0.78rem", color: C.inkFaint, margin: "0 0 1.25rem", lineHeight: 1.6 }}>
-            Based on average final scores from verified scorecards submitted to Bitseat across all nine BITSAT 2026 shifts.
+            Each submission contributes two data points — one per session sat. Scores are matched to their respective shift using the session dates on your scorecard.
           </p>
           <ShiftDifficultyIndex rows={stats.shiftDifficulty} loading={stats.loading} />
         </div>
