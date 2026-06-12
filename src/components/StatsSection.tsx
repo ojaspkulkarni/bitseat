@@ -178,6 +178,7 @@ function BigStat({
   );
 }
 
+//nice code, eh?
 /* ─── Skeleton shimmer ───────────────────────────── */
 function Skeleton() {
   return (
