@@ -4,6 +4,7 @@ import { extractBitsatData } from "./lib/extractFinalScore";
 import type { ExtractedBitsatData } from "./lib/extractFinalScore";
 import { supabase } from "./lib/supabase";
 import FoundersNote from "./pages/FoundersNote";
+import ReferralLanding from "./pages/ReferralLanding";
 import PreferenceSetup from "./components/PreferenceSetup";
 import StatsSection from "./components/StatsSection";
 import type { Branch } from "./data/cutoffs";
@@ -102,6 +103,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/founders-note" element={<FoundersNote />} />
+      <Route path="/r/:userId" element={<ReferralLanding />} />
     </Routes>
   );
 }

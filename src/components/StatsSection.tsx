@@ -4,7 +4,6 @@ import { type Branch, estimatedRank, estimatedPercentile } from "../data/cutoffs
 import { C, font, eyebrow } from "./stats.tokens";
 import { StatCard, BigStat, Skeleton, ThinDataNote, RankTooltip, PercentileTooltip } from "./stats.primitives";
 import { ScoreHistogram } from "./ScoreHistogram";
-import { HotBranches, computePrefUpsets, type PrefUpset } from "./HotBranches";
 import { ShiftDifficultyIndex, computeShiftDifficulty, type ShiftDifficultyRow } from "./ShiftDifficultyIndex";
 
 /* ─── Helpers ────────────────────────────────────── */
@@ -46,7 +45,6 @@ interface StatsState {
   allScores: number[];
   shiftScores: number[];
   centerScores: number[];
-  prefUpsets: PrefUpset[];
   referralCount: number;
   otherShiftScoresByShift: Record<string, number[]>;
   shiftDifficulty: ShiftDifficultyRow[];
@@ -59,7 +57,6 @@ export default function StatsSection({ finalScore, testDate, center, preferences
     allScores: [],
     shiftScores: [],
     centerScores: [],
-    prefUpsets: [],
     referralCount: 0,
     otherShiftScoresByShift: {},
     shiftDifficulty: [],
@@ -84,15 +81,14 @@ export default function StatsSection({ finalScore, testDate, center, preferences
   async function loadStats() {
     setStats((s) => ({ ...s, loading: true }));
 
-    const [scoresRes, prefsRes, referralsRes] = await Promise.all([
+    const [scoresRes, referralsRes] = await Promise.all([
       supabase.from("scores").select("final_score, test_date, center, user_id"),
-      supabase.from("preferences").select("branch_keys, user_id"),
       supabase.from("referrals").select("share_clicks").eq("user_id", userId ?? "").maybeSingle(),
     ]);
 
     const rows = scoresRes.data;
     if (scoresRes.error || !rows) {
-      setStats({ loading: false, allScores: [], shiftScores: [], centerScores: [], prefUpsets: [], referralCount: 0, otherShiftScoresByShift: {}, shiftDifficulty: [] });
+      setStats({ loading: false, allScores: [], shiftScores: [], centerScores: [], referralCount: 0, otherShiftScoresByShift: {}, shiftDifficulty: [] });
       return;
     }
 
@@ -122,11 +118,10 @@ export default function StatsSection({ finalScore, testDate, center, preferences
       otherShiftScoresByShift[r.test_date].push(r.final_score);
     }
 
-    const prefUpsets = computePrefUpsets(prefsRes.data ?? [], rows);
     const referralCount = referralsRes.data?.share_clicks ?? 0;
     const shiftDifficulty = computeShiftDifficulty(rows, testDate ?? null);
 
-    setStats({ loading: false, allScores, shiftScores, centerScores, prefUpsets, referralCount, otherShiftScoresByShift, shiftDifficulty });
+    setStats({ loading: false, allScores, shiftScores, centerScores, referralCount, otherShiftScoresByShift, shiftDifficulty });
   }
 
   const score = finalScore ?? 0;
@@ -302,26 +297,6 @@ export default function StatsSection({ finalScore, testDate, center, preferences
             shareClicks={stats.referralCount}
             shareUrl={`${window.location.origin}/r/${userId ?? ""}`}
           />
-        </div>
-      </div>
-
-      {/* ── Hot Branches 2026 ────────────────────── */}
-      <div style={{ marginTop: "1.25rem" }}>
-        <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "2.25rem" }}>
-          <p style={{ ...eyebrow, marginBottom: "0.35rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <svg width="11" height="13" viewBox="0 0 11 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5.5 0C5.5 0 8.5 3 8.5 5.5C8.5 6.5 8 7.3 7.2 7.8C7.4 7.2 7.3 6.5 6.9 6C6.9 7.5 6 8.8 4.8 9.5C5 8.8 4.9 8 4.4 7.4C4 8 3.5 8.8 3.5 9.8C2.5 9 2 7.7 2 6.3C2 5.5 2.2 4.7 2.6 4C2.3 4.6 2.2 5.3 2.3 6C1.3 5.1 0.8 3.8 1 2.5C1 2.5 2.5 4 3 4.5C2.5 3 3.5 1 5.5 0Z" fill="#d77656"/>
-              <path d="M5.5 7C5.5 7 6.8 8.2 6.8 9.3C6.8 10.3 6.2 11 5.5 11C4.8 11 4.2 10.3 4.2 9.3C4.2 8.2 5.5 7 5.5 7Z" fill="#b85e3e"/>
-            </svg>
-            Hot Branches 2026
-          </p>
-          <p style={{ fontFamily: font.sans, fontSize: "0.82rem", fontWeight: 600, color: C.inkMid, margin: "0 0 0.35rem", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
-            Preference trends that defy 2025 cutoffs
-          </p>
-          <p style={{ fontFamily: font.sans, fontSize: "0.78rem", color: C.inkFaint, margin: "0 0 1.25rem", lineHeight: 1.6 }}>
-            Among users who clear both branches, these are pairs where people consistently rank the lower-cutoff branch first — signalling a shift in demand.
-          </p>
-          <HotBranches upsets={stats.prefUpsets} loading={stats.loading} />
         </div>
       </div>
 
