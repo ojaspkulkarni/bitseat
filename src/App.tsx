@@ -108,11 +108,41 @@ export default function App() {
 
 type AppView = "loading" | "landing" | "preference-setup" | "results";
 
+type ScoreRow = {
+  id: string;
+  candidate_name: string | null;
+  application_number: string;
+  test_date: string | null;
+  center: string | null;
+  session1_score: number | null;
+  session2_score: number | null;
+  final_score: number | null;
+  created_at: string;
+};
+
+function scoreRowToData(row: ScoreRow): ExtractedBitsatData {
+  return {
+    candidateName: row.candidate_name,
+    applicationNumber: row.application_number,
+    testDate: row.test_date,
+    center: row.center,
+    session1Score: row.session1_score,
+    session2Score: row.session2_score,
+    finalScore: row.final_score,
+    rawText: "",
+  };
+}
+
 function Home() {
   const [data, setData] = useState<ExtractedBitsatData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [user, setUser] = useState<any>(null);
+
+  // All scorecards linked to this user (most recent first)
+  const [myScores, setMyScores] = useState<ScoreRow[]>([]);
+  // id of the scorecard currently shown on the results page
+  const [activeScoreId, setActiveScoreId] = useState<string | null>(null);
 
   const [preferences, setPreferences] = useState<Branch[]>([]);
   // Whether the user has explicitly confirmed their preferences (seen the setup screen)
@@ -176,13 +206,11 @@ function Home() {
 
   async function loadExistingScore(currentUser: any) {
     try {
-      const { data: existing, error: fetchError } = await supabase
-        .from("scores")
-        .select("*")
+      const { data: links, error: fetchError } = await supabase
+        .from("score_users")
+        .select("created_at, scores(*)")
         .eq("user_id", currentUser.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: false });
 
       if (fetchError) {
         console.error("Score load error:", fetchError);
@@ -190,17 +218,16 @@ function Home() {
         return;
       }
 
-      if (existing) {
-        setData({
-          candidateName: existing.candidate_name,
-          applicationNumber: existing.application_number,
-          testDate: existing.test_date,
-          center: existing.center,
-          session1Score: existing.session1_score,
-          session2Score: existing.session2_score,
-          finalScore: existing.final_score,
-          rawText: "",
-        });
+      const rows: ScoreRow[] = (links ?? [])
+        .map((l: any) => l.scores)
+        .filter((s: any): s is ScoreRow => !!s);
+
+      setMyScores(rows);
+
+      if (rows.length > 0) {
+        const latest = rows[0];
+        setActiveScoreId(latest.id);
+        setData(scoreRowToData(latest));
         const loaded = await loadPreferences(currentUser.id);
         // If they already have saved preferences, skip the setup screen
         if (loaded && loaded.length > 0) {
@@ -211,6 +238,12 @@ function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function selectScore(row: ScoreRow) {
+    setActiveScoreId(row.id);
+    setData(scoreRowToData(row));
+    setStatsRefreshKey((k) => k + 1);
   }
 
   async function loadPreferences(userId: string): Promise<Branch[]> {
@@ -250,6 +283,8 @@ function Home() {
     setData(null);
     setPreferences([]);
     setPrefConfirmed(false);
+    setMyScores([]);
+    setActiveScoreId(null);
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -266,39 +301,46 @@ function Home() {
         .eq("application_number", parsed.applicationNumber).maybeSingle();
       if (fetchError) throw fetchError;
 
+      let scoreRow: ScoreRow;
+
       if (existing) {
         // Use the authoritative DB row, not the freshly-parsed PDF, so data is never stale
-        setData({
-          candidateName: existing.candidate_name,
-          applicationNumber: existing.application_number,
-          testDate: existing.test_date,
-          center: existing.center,
-          session1Score: existing.session1_score,
-          session2Score: existing.session2_score,
-          finalScore: existing.final_score,
-          rawText: "",
-        });
-        setStatsRefreshKey((k) => k + 1);
-        const loaded = await loadPreferences(user.id);
-        if (loaded && loaded.length > 0) setPrefConfirmed(true);
-        return;
+        scoreRow = existing as ScoreRow;
+      } else {
+        const { data: inserted, error: insertError } = await supabase
+          .from("scores")
+          .insert({
+            application_number: parsed.applicationNumber,
+            candidate_name: parsed.candidateName,
+            test_date: parsed.testDate,
+            center: parsed.center,
+            session1_score: parsed.session1Score,
+            session2_score: parsed.session2Score,
+            final_score: parsed.finalScore,
+          })
+          .select("*")
+          .single();
+        if (insertError) throw insertError;
+        scoreRow = inserted as ScoreRow;
       }
 
-      const { error: insertError } = await supabase.from("scores").insert({
-        user_id: user.id,
-        application_number: parsed.applicationNumber,
-        candidate_name: parsed.candidateName,
-        test_date: parsed.testDate,
-        center: parsed.center,
-        session1_score: parsed.session1Score,
-        session2_score: parsed.session2Score,
-        final_score: parsed.finalScore,
-      });
-      if (insertError) throw insertError;
-      setData(parsed);
-      setStatsRefreshKey((k) => k + 1);
-      // New upload → always show preference setup
-      setPrefConfirmed(false);
+      // Link this scorecard to the signed-in account (no-op if already linked)
+      const { error: linkError } = await supabase
+        .from("score_users")
+        .upsert({ user_id: user.id, score_id: scoreRow.id }, { onConflict: "user_id,score_id" });
+      if (linkError) throw linkError;
+
+      // Refresh the list of linked scorecards for this user
+      await loadExistingScore(user);
+      selectScore(scoreRow);
+
+      if (existing) {
+        const loaded = await loadPreferences(user.id);
+        if (loaded && loaded.length > 0) setPrefConfirmed(true);
+      } else {
+        // New scorecard → always show preference setup
+        setPrefConfirmed(false);
+      }
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Unknown parsing error.");
@@ -384,6 +426,52 @@ function Home() {
             <ScoreCard label="Session 2" value={data.session2Score} />
             <ScoreCard label="Final Score" value={data.finalScore} highlight />
           </div>
+
+          {myScores.length > 1 && (
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "3rem", marginBottom: "3rem" }}>
+              <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Your scorecards</p>
+              <h2 style={{ fontFamily: font.serif, fontSize: "1.7rem", color: C.ink, fontWeight: 400, margin: "0 0 1.25rem" }}>
+                {myScores.length} scorecards linked to this account
+              </h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                {myScores.map((row) => {
+                  const isActive = row.id === activeScoreId;
+                  return (
+                    <button
+                      key={row.id}
+                      onClick={() => selectScore(row)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "1rem",
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "1rem 1.25rem",
+                        borderRadius: "10px",
+                        border: isActive ? `1px solid ${C.rust}` : `1px solid ${C.border}`,
+                        background: isActive ? C.rustLight : C.white,
+                        cursor: "pointer",
+                        fontFamily: font.sans,
+                      }}
+                    >
+                      <span>
+                        <span style={{ display: "block", fontWeight: 600, color: C.ink, fontSize: "0.95rem" }}>
+                          {row.candidate_name ? toTitleCase(row.candidate_name) : `Application ${row.application_number}`}
+                        </span>
+                        <span style={{ display: "block", color: C.inkFaint, fontSize: "0.8rem", marginTop: "0.2rem" }}>
+                          {row.test_date ? formatShift(row.test_date) : ""}{row.center ? ` · ${row.center}` : ""}
+                        </span>
+                      </span>
+                      <span style={{ fontFamily: font.serif, fontSize: "1.5rem", color: C.rust, fontWeight: 400 }}>
+                        {row.final_score ?? "—"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "3rem", marginBottom: "3rem" }}>
             <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Branch preferences</p>
