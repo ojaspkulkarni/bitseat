@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Routes, Route, Link } from "react-router-dom";
 import { extractBitsatData } from "./lib/extractFinalScore";
 import type { ExtractedBitsatData } from "./lib/extractFinalScore";
@@ -406,6 +406,13 @@ function Home() {
                 <input type="file" accept=".pdf" onChange={handleFileChange} style={{ display: "none" }} />
               </label>
               <button onClick={signOut} style={ghostBtn}>Sign out</button>
+              {myScores.length > 1 && (
+                <ScorecardsMenu
+                  scores={myScores}
+                  activeScoreId={activeScoreId}
+                  onSelect={selectScore}
+                />
+              )}
             </div>
           </div>
         </nav>
@@ -427,52 +434,6 @@ function Home() {
             <ScoreCard label="Final Score" value={data.finalScore} highlight />
           </div>
 
-          {myScores.length > 1 && (
-            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "3rem", marginBottom: "3rem" }}>
-              <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Your scorecards</p>
-              <h2 style={{ fontFamily: font.serif, fontSize: "1.7rem", color: C.ink, fontWeight: 400, margin: "0 0 1.25rem" }}>
-                {myScores.length} scorecards linked to this account
-              </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                {myScores.map((row) => {
-                  const isActive = row.id === activeScoreId;
-                  return (
-                    <button
-                      key={row.id}
-                      onClick={() => selectScore(row)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "1rem",
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "1rem 1.25rem",
-                        borderRadius: "10px",
-                        border: isActive ? `1px solid ${C.rust}` : `1px solid ${C.border}`,
-                        background: isActive ? C.rustLight : C.white,
-                        cursor: "pointer",
-                        fontFamily: font.sans,
-                      }}
-                    >
-                      <span>
-                        <span style={{ display: "block", fontWeight: 600, color: C.ink, fontSize: "0.95rem" }}>
-                          {row.candidate_name ? toTitleCase(row.candidate_name) : `Application ${row.application_number}`}
-                        </span>
-                        <span style={{ display: "block", color: C.inkFaint, fontSize: "0.8rem", marginTop: "0.2rem" }}>
-                          {row.test_date ? formatShift(row.test_date) : ""}{row.center ? ` · ${row.center}` : ""}
-                        </span>
-                      </span>
-                      <span style={{ fontFamily: font.serif, fontSize: "1.5rem", color: C.rust, fontWeight: 400 }}>
-                        {row.final_score ?? "—"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "3rem", marginBottom: "3rem" }}>
             <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Branch preferences</p>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
@@ -488,21 +449,6 @@ function Home() {
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 Edit preferences
               </button>
-            </div>
-          </div>
-
-          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "3rem", marginBottom: "3rem" }}>
-            <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Coming soon</p>
-            <h2 style={{ fontFamily: font.serif, fontSize: "1.7rem", color: C.ink, fontWeight: 400, margin: "0 0 0.5rem" }}>
-              Shift-adjusted score
-            </h2>
-            <p style={{ color: C.inkFaint, fontSize: "0.88rem", fontFamily: font.sans, margin: "0 0 2rem" }}>
-              What would you have scored in a different shift? We're building the statistical framework to answer that fairly — it needs enough cross-shift data before the numbers mean anything. Coming once we have it.
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>
-              <AnalyticsCard title="Shift Difficulty Index" subtitle="Relative difficulty of each shift, derived from verified score distributions." illustration={<ShiftDifficultyIllustration />} />
-              <AnalyticsCard title="Normalised Score" subtitle="Your score adjusted for shift difficulty — comparable across all sessions." illustration={<LivePercentileIllustration />} />
-              <AnalyticsCard title="Score Distribution" subtitle="See where your score sits across all shifts combined." illustration={<ScoreDistributionIllustration />} />
             </div>
           </div>
 
@@ -663,6 +609,85 @@ function UploadZone({ user, loading, error, onFileChange }: { user: any; loading
       </label>
       {loading && <p style={{ marginTop: "1.25rem", color: C.rust, fontWeight: 600, fontSize: "0.9rem", textAlign: "center" }}>Parsing PDF…</p>}
       {error && <div style={{ marginTop: "1rem", padding: "0.9rem 1.1rem", borderRadius: "10px", background: "#FFF1F2", color: "#BE123C", fontWeight: 500, fontSize: "0.9rem" }}>{error}</div>}
+    </div>
+  );
+}
+
+/* ─── Scorecards three-dot menu ─────────────────── */
+function ScorecardsMenu({ scores, activeScoreId, onSelect }: { scores: ScoreRow[]; activeScoreId: string | null; onSelect: (row: ScoreRow) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: "relative" as const }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Your scorecards"
+        style={{ ...ghostBtn, padding: "0.75rem 0.9rem" }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute" as const,
+          top: "calc(100% + 0.5rem)",
+          right: 0,
+          width: "min(22rem, 90vw)",
+          background: C.white,
+          border: `1px solid ${C.border}`,
+          borderRadius: "12px",
+          boxShadow: "0 8px 24px rgba(28,22,18,0.08)",
+          padding: "0.75rem",
+          zIndex: 50,
+        }}>
+          <p style={{ ...eyebrow, margin: "0.25rem 0.5rem 0.6rem" }}>Your scorecards</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: "20rem", overflowY: "auto" as const }}>
+            {scores.map((row) => {
+              const isActive = row.id === activeScoreId;
+              return (
+                <button
+                  key={row.id}
+                  onClick={() => { onSelect(row); setOpen(false); }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "0.75rem",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "0.6rem 0.75rem",
+                    borderRadius: "8px",
+                    border: isActive ? `1px solid ${C.rust}` : "1px solid transparent",
+                    background: isActive ? C.rustLight : "transparent",
+                    cursor: "pointer",
+                    fontFamily: font.sans,
+                  }}
+                >
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontWeight: 600, color: C.ink, fontSize: "0.88rem", whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {row.candidate_name ? toTitleCase(row.candidate_name) : `Application ${row.application_number}`}
+                    </span>
+                    <span style={{ display: "block", color: C.inkFaint, fontSize: "0.75rem", marginTop: "0.15rem" }}>
+                      {row.test_date ? formatShift(row.test_date) : ""}
+                    </span>
+                  </span>
+                  <span style={{ fontFamily: font.serif, fontSize: "1.2rem", color: C.rust, fontWeight: 400, flexShrink: 0 }}>
+                    {row.final_score ?? "—"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
