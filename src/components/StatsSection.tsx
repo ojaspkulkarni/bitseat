@@ -37,6 +37,7 @@ interface Props {
   center: string | null;
   preferences: Branch[];
   userId: string | null;
+  refreshKey?: number;
 }
 
 interface StatsState {
@@ -50,7 +51,7 @@ interface StatsState {
 }
 
 /* ─── Main component ─────────────────────────────── */
-export default function StatsSection({ finalScore, testDate, center, preferences, userId }: Props) {
+export default function StatsSection({ finalScore, testDate, center, preferences, userId, refreshKey = 0 }: Props) {
   const [stats, setStats] = useState<StatsState>({
     loading: true,
     allScores: [],
@@ -75,7 +76,7 @@ export default function StatsSection({ finalScore, testDate, center, preferences
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [finalScore, testDate, center]);
+  }, [finalScore, testDate, center, refreshKey]);
 
   async function loadStats() {
     setStats((s) => ({ ...s, loading: true }));

@@ -117,6 +117,7 @@ function Home() {
   const [preferences, setPreferences] = useState<Branch[]>([]);
   // Whether the user has explicitly confirmed their preferences (seen the setup screen)
   const [prefConfirmed, setPrefConfirmed] = useState(false);
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0);
 
   const view: AppView = loading
     ? "loading"
@@ -266,7 +267,18 @@ function Home() {
       if (fetchError) throw fetchError;
 
       if (existing) {
-        setData(parsed);
+        // Use the authoritative DB row, not the freshly-parsed PDF, so data is never stale
+        setData({
+          candidateName: existing.candidate_name,
+          applicationNumber: existing.application_number,
+          testDate: existing.test_date,
+          center: existing.center,
+          session1Score: existing.session1_score,
+          session2Score: existing.session2_score,
+          finalScore: existing.final_score,
+          rawText: "",
+        });
+        setStatsRefreshKey((k) => k + 1);
         const loaded = await loadPreferences(user.id);
         if (loaded && loaded.length > 0) setPrefConfirmed(true);
         return;
@@ -284,6 +296,7 @@ function Home() {
       });
       if (insertError) throw insertError;
       setData(parsed);
+      setStatsRefreshKey((k) => k + 1);
       // New upload → always show preference setup
       setPrefConfirmed(false);
     } catch (err) {
@@ -344,6 +357,11 @@ function Home() {
             <Link to="/founders-note" style={{ color: C.inkMid, fontSize: "0.85rem", textDecoration: "none", fontFamily: font.sans, borderBottom: `1px solid ${C.borderMid}`, paddingBottom: "1px" }}>
               A note from the founders
             </Link>
+            <label style={{ ...ghostBtn, cursor: "pointer", position: "relative" as const }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload new PDF
+              <input type="file" accept=".pdf" onChange={handleFileChange} style={{ display: "none" }} />
+            </label>
             <button onClick={signOut} style={ghostBtn}>Sign out</button>
           </div>
         </nav>
@@ -356,34 +374,8 @@ function Home() {
             center={data.center}
             preferences={preferences}
             userId={user?.id ?? null}
+            refreshKey={statsRefreshKey}
           />
-
-          {/* ── Score distribution histogram placeholder ── */}
-          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "3rem", marginBottom: "4rem" }}>
-            <p style={{ ...eyebrow, marginBottom: "0.75rem" }}>Score distribution</p>
-            <h2 style={{ fontFamily: font.serif, fontSize: "1.7rem", color: C.ink, fontWeight: 400, margin: "0 0 2rem" }}>
-              Where you sit in the field
-            </h2>
-            <div style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: "16px",
-              height: "200px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              gap: "0.5rem",
-            }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.inkFaint} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="13" width="4" height="8"/><rect x="9" y="9" width="4" height="12"/><rect x="16" y="5" width="4" height="16"/>
-                <line x1="2" y1="21" x2="22" y2="21"/>
-              </svg>
-              <p style={{ fontFamily: font.sans, fontSize: "0.85rem", color: C.inkFaint, margin: 0 }}>
-                Histogram coming once enough data is in
-              </p>
-            </div>
-          </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "4rem" }}>
             <ScoreCard label="Session 1" value={data.session1Score} />

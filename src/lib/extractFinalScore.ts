@@ -49,6 +49,28 @@ export async function extractBitsatData(file: File): Promise<ExtractedBitsatData
   const session2Score = scoreBlockMatch ? parseInt(scoreBlockMatch[2], 10) : null;
   const finalScore    = scoreBlockMatch ? parseInt(scoreBlockMatch[4], 10) : null;
 
+  // Validate that this looks like a real BITSAT scorecard
+  const isBitsatDoc =
+    /BITSAT/i.test(cleaned) &&
+    /BITS\s*Pilani|Birla\s*Institute/i.test(cleaned);
+
+  if (!isBitsatDoc) {
+    throw new Error(
+      "This doesn't look like a BITSAT scorecard. Please upload the official PDF downloaded from the BITS Pilani admissions portal."
+    );
+  }
+
+  // Detect session-1-only or session-2-only PDFs (they lack the combined final score block)
+  const hasSession1 = /session\s*1|Session\s*I\b/i.test(cleaned);
+  const hasSession2 = /session\s*2|Session\s*II\b/i.test(cleaned);
+  const hasFinalBlock = scoreBlockMatch !== null;
+
+  if (!hasFinalBlock && (hasSession1 || hasSession2)) {
+    throw new Error(
+      "Please upload the combined scorecard (with both sessions and the final score), not a single-session result PDF."
+    );
+  }
+
   const data: ExtractedBitsatData = {
     candidateName,
     applicationNumber,
@@ -61,11 +83,11 @@ export async function extractBitsatData(file: File): Promise<ExtractedBitsatData
   };
 
   if (!data.applicationNumber) {
-    throw new Error("Could not detect application number.");
+    throw new Error("Could not detect application number. Make sure you're uploading the official BITSAT scorecard PDF.");
   }
 
   if (!data.session1Score && !data.session2Score && !data.finalScore) {
-    throw new Error("Could not extract final score.");
+    throw new Error("Could not extract scores from this PDF. Make sure you're uploading the official BITSAT scorecard PDF.");
   }
 
   return data;
