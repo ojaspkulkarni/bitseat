@@ -213,28 +213,6 @@ function ThinDataNote({ count, context }: { count: number; context: string }) {
   );
 }
 
-/* ─── Rank alert footer ──────────────────────────── */
-function RankAlert() {
-  return (
-    <p
-      style={{
-        fontFamily: font.sans,
-        fontSize: "0.78rem",
-        color: C.inkMid,
-        margin: 0,
-        lineHeight: 1.6,
-        display: "flex",
-        gap: "0.4rem",
-        alignItems: "flex-start",
-      }}
-    >
-      <span style={{ color: C.rust, fontWeight: 700, flexShrink: 0 }}>↗</span>
-      Once enough data accumulates, this will show your estimated BITS rank
-      directly.
-    </p>
-  );
-}
-
 /* ─── Props ──────────────────────────────────────── */
 interface Props {
   finalScore: number | null;

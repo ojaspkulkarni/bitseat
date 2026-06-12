@@ -66,22 +66,6 @@ export async function extractBitsatData(
     );
   };
 
-  const extractNumber = (
-    regex: RegExp
-  ): number | null => {
-    const match =
-      cleaned.match(regex);
-
-    if (!match?.[1]) {
-      return null;
-    }
-
-    return parseInt(
-      match[1],
-      10
-    );
-  };
-
   // Candidate name
   const candidateName =
     extract(
