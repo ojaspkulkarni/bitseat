@@ -31,35 +31,31 @@ export default function FoundersNote() {
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: font.sans }}>
 
       {/* Nav */}
-      <nav style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "1.25rem 2.5rem",
-        borderBottom: `1px solid ${C.border}`,
-      }}>
-        <Link to="/" style={{ display: "inline-block", lineHeight: 0 }}>
-          <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "32px" }} />
-        </Link>
-        <Link to="/" style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "0.4rem",
-          fontSize: "0.88rem",
-          fontWeight: 500,
-          color: C.inkMid,
-          textDecoration: "none",
-          fontFamily: font.sans,
-        }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 5l-7 7 7 7"/>
-          </svg>
-          Back
-        </Link>
+      <nav className="site-nav">
+        <div className="site-nav__inner">
+          <Link to="/" style={{ display: "inline-block", lineHeight: 0 }}>
+            <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "32px" }} />
+          </Link>
+          <Link to="/" style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.4rem",
+            fontSize: "0.88rem",
+            fontWeight: 500,
+            color: C.inkMid,
+            textDecoration: "none",
+            fontFamily: font.sans,
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7"/>
+            </svg>
+            Back
+          </Link>
+        </div>
       </nav>
 
       {/* Letter */}
-      <main style={{ maxWidth: "920px", margin: "0 auto", padding: "5rem 2.5rem 7rem" }}>
+      <main className="prose page-container" style={{ paddingTop: "clamp(3rem, 6vw, 5rem)", paddingBottom: "clamp(4rem, 8vw, 7rem)" }}>
 
         <p style={{
           fontFamily: font.sans,
@@ -145,8 +141,8 @@ export default function FoundersNote() {
 
       </main>
 
-      <footer style={{ padding: "1.75rem 2.5rem", borderTop: `1px solid ${C.border}` }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
+      <footer className="site-footer">
+        <div className="site-footer__inner">
           <p style={{ color: C.inkFaint, fontSize: "0.85rem", margin: 0, fontFamily: font.sans }}>
             © 2026 Bitseat · Built for BITSAT aspirants
           </p>

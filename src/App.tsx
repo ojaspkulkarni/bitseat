@@ -321,7 +321,7 @@ function Home() {
         fontSize: "0.9rem",
       }}>
         <div style={{ textAlign: "center" }}>
-          <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "120px", display: "block", margin: "0 auto 2rem" }} />
+          <img src="/logo/Bitseat logo.png" alt="Bitseat" className="loading-logo" />
           Loading…
         </div>
       </div>
@@ -349,24 +349,26 @@ function Home() {
   if (view === "results" && data) {
     return (
       <div style={{ minHeight: "100vh", background: C.cream, fontFamily: font.sans }}>
-        <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.25rem 2.5rem", borderBottom: `1px solid ${C.border}` }}>
-          <Link to="/" style={{ display: "inline-block", lineHeight: 0 }}>
-            <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "32px" }} />
-          </Link>
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <Link to="/founders-note" style={{ color: C.inkMid, fontSize: "0.85rem", textDecoration: "none", fontFamily: font.sans, borderBottom: `1px solid ${C.borderMid}`, paddingBottom: "1px" }}>
-              A note from the founders
+        <nav className="site-nav">
+          <div className="site-nav__inner">
+            <Link to="/" style={{ display: "inline-block", lineHeight: 0 }}>
+              <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "32px" }} />
             </Link>
-            <label style={{ ...ghostBtn, cursor: "pointer", position: "relative" as const }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Upload new PDF
-              <input type="file" accept=".pdf" onChange={handleFileChange} style={{ display: "none" }} />
-            </label>
-            <button onClick={signOut} style={ghostBtn}>Sign out</button>
+            <div className="site-nav__actions">
+              <Link to="/founders-note" className="nav-secondary-link results-nav-link" style={{ color: C.inkMid, fontSize: "0.85rem", textDecoration: "none", fontFamily: font.sans, borderBottom: `1px solid ${C.borderMid}`, paddingBottom: "1px" }}>
+                A note from the founders
+              </Link>
+              <label style={{ ...ghostBtn, cursor: "pointer", position: "relative" as const }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Upload new PDF
+                <input type="file" accept=".pdf" onChange={handleFileChange} style={{ display: "none" }} />
+              </label>
+              <button onClick={signOut} style={ghostBtn}>Sign out</button>
+            </div>
           </div>
         </nav>
 
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "3rem 2.5rem 4rem" }}>
+        <div className="results-content">
 
           <StatsSection
             finalScore={data.finalScore}
@@ -440,16 +442,18 @@ function Home() {
   return (
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: font.sans }}>
 
-      <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.25rem 2.5rem", borderBottom: `1px solid ${C.border}` }}>
-        <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "32px" }} />
-        {user
-          ? <button onClick={signOut} style={ghostBtn}>Sign out</button>
-          : <button onClick={signInWithGoogle} style={ghostBtn}>Sign in</button>
-        }
+      <nav className="site-nav">
+        <div className="site-nav__inner">
+          <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "32px" }} />
+          {user
+            ? <button onClick={signOut} style={ghostBtn}>Sign out</button>
+            : <button onClick={signInWithGoogle} style={ghostBtn}>Sign in</button>
+          }
+        </div>
       </nav>
 
-      <section style={{ maxWidth: "1100px", margin: "0 auto", padding: "6rem 2.5rem 5rem" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5rem", alignItems: "center" }}>
+      <section className="page-container" style={{ paddingTop: "clamp(3rem, 8vw, 6rem)", paddingBottom: "clamp(3rem, 6vw, 5rem)" }}>
+        <div className="hero-grid">
           <div>
             <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ width: "100%", maxWidth: "420px", display: "block", marginBottom: "2rem" }} />
             <h1 style={{ fontFamily: font.serif, fontSize: "clamp(1.6rem, 2.8vw, 2.4rem)", color: C.inkMid, fontWeight: 400, lineHeight: 1.25, margin: "0 0 1.75rem" }}>
@@ -470,10 +474,10 @@ function Home() {
         </div>
       </section>
 
-      <section style={{ background: C.creamDark, borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, padding: "5rem 2.5rem" }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
+      <section style={{ background: C.creamDark, borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, padding: "clamp(3rem, 6vw, 5rem) 0" }}>
+        <div className="page-container">
           <p style={{ ...eyebrow, marginBottom: "2.5rem" }}>Why Bitseat</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1.25rem" }}>
+          <div className="grid-auto">
             <TrustCard
               icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.rust} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}
               title="Your name stays out of it"
@@ -493,12 +497,12 @@ function Home() {
         </div>
       </section>
 
-      <section style={{ maxWidth: "1100px", margin: "0 auto", padding: "5rem 2.5rem" }}>
+      <section className="page-container" style={{ paddingTop: "clamp(3rem, 6vw, 5rem)", paddingBottom: "clamp(3rem, 6vw, 5rem)" }}>
         <p style={{ ...eyebrow, marginBottom: "1rem" }}>Coming soon</p>
         <h2 style={{ fontFamily: font.serif, fontSize: "clamp(1.8rem, 3vw, 2.5rem)", fontWeight: 400, color: C.ink, margin: "0 0 3rem" }}>
           Live analytics are on the way.
         </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>
+        <div className="grid-auto">
           <AnalyticsCard title="Score Distribution" subtitle="Visualize how students are scoring across shifts." illustration={<ScoreDistributionIllustration />} />
           <AnalyticsCard title="Shift Analysis" subtitle="Understand relative shift difficulty using verified data." illustration={<ShiftDifficultyIllustration />} />
           <AnalyticsCard title="Percentile Estimates" subtitle="Dynamic predictions powered by live submissions." illustration={<LivePercentileIllustration />} />
@@ -506,8 +510,8 @@ function Home() {
       </section>
 
       {!user && (
-        <section style={{ background: C.rust, padding: "6rem 2.5rem" }}>
-          <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
+        <section className="cta-section">
+          <div className="page-container">
             <h2 style={{ fontFamily: font.serif, fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 400, color: C.white, margin: "0 0 1rem", lineHeight: 1.15 }}>
               Upload your scorecard.<br />See where you stand.
             </h2>
@@ -522,8 +526,8 @@ function Home() {
         </section>
       )}
 
-      <footer style={{ padding: "1.75rem 2.5rem", borderTop: `1px solid ${C.border}` }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
+      <footer className="site-footer">
+        <div className="site-footer__inner">
           <p style={{ color: C.inkFaint, fontSize: "0.85rem", margin: 0 }}>© 2026 Bitseat · Built for BITSAT aspirants</p>
           <Link to="/founders-note" style={{ color: C.inkMid, fontSize: "0.85rem", textDecoration: "none", fontFamily: font.sans, borderBottom: `1px solid ${C.borderMid}`, paddingBottom: "1px" }}>
             A note from the founders →

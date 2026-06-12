@@ -93,25 +93,27 @@ export default function PreferenceSetup({ finalScore, candidateName, initialPref
   return (
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: font.sans }}>
       {/* Nav */}
-      <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.25rem 2.5rem", borderBottom: `1px solid ${C.border}` }}>
-        <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "32px" }} />
-        <button
-          onClick={onSkip}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: C.inkFaint,
-            fontFamily: font.sans,
-            fontSize: "0.88rem",
-            cursor: "pointer",
-            padding: "0.4rem 0.75rem",
-          }}
-        >
-          Skip for now →
-        </button>
+      <nav className="site-nav">
+        <div className="site-nav__inner">
+          <img src="/logo/Bitseat logo.png" alt="Bitseat" style={{ height: "32px" }} />
+          <button
+            onClick={onSkip}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: C.inkFaint,
+              fontFamily: font.sans,
+              fontSize: "0.88rem",
+              cursor: "pointer",
+              padding: "0.4rem 0.75rem",
+            }}
+          >
+            Skip for now →
+          </button>
+        </div>
       </nav>
 
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "3.5rem 2.5rem" }}>
+      <div className="page-container" style={{ paddingTop: "clamp(2rem, 5vw, 3.5rem)", paddingBottom: "3rem" }}>
 
         {/* Header */}
         <div style={{ marginBottom: "3rem", maxWidth: "600px" }}>
@@ -132,7 +134,7 @@ export default function PreferenceSetup({ finalScore, candidateName, initialPref
           </p>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2.5rem", alignItems: "start" }}>
+        <div className="pref-grid pref-scroll-content">
 
           {/* LEFT: Catalogue */}
           <div>
@@ -240,7 +242,7 @@ export default function PreferenceSetup({ finalScore, candidateName, initialPref
           </div>
 
           {/* RIGHT: Selected list + confirm */}
-          <div style={{ position: "sticky", top: "2rem" }}>
+          <div className="pref-right-panel">
             <p style={{ ...eyebrow, marginBottom: "1rem" }}>
               Your selection
               {preferences.length > 0 && <span style={{ color: C.inkFaint, fontWeight: 400, textTransform: "none", letterSpacing: 0, fontSize: "0.78rem" }}> ({preferences.length})</span>}
@@ -337,6 +339,23 @@ export default function PreferenceSetup({ finalScore, candidateName, initialPref
             )}
           </div>
         </div>
+
+        {/* Mobile-only fixed bottom confirm bar */}
+        <div className="pref-mobile-confirm">
+          <button
+            onClick={() => onDone(preferences)}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              gap: "0.5rem", width: "100%", padding: "0.85rem 1.5rem",
+              borderRadius: "10px", border: "none",
+              background: C.rust, color: C.white,
+              fontFamily: font.sans, fontWeight: 600, fontSize: "1rem", cursor: "pointer",
+            }}
+          >
+            {preferences.length === 0 ? "Continue without preferences" : `Save ${preferences.length} branch${preferences.length === 1 ? "" : "es"} →`}
+          </button>
+        </div>
+
       </div>
     </div>
   );

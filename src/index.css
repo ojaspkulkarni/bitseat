@@ -1,22 +1,7 @@
-:root {
-  font-family: Inter, system-ui, sans-serif;
-  color: #111827;
-  background: #ffffff;
-}
+/* ── Global styles & design token system ── */
+@import './global.css';
 
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  margin: 0;
-  width: 100%;
-  min-height: 100%;
-  background: white;
-}
-
-body {
-  overflow-x: hidden;
-}
+/* ── Component-specific overrides that need global scope ── */
+/* (App.css is imported in main.tsx for legacy Vite scaffold styles.
+   Bitseat's actual UI lives entirely in component inline-styles,
+   supplemented by global.css above.) */

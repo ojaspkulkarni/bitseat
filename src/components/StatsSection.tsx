@@ -210,7 +210,7 @@ export default function StatsSection({ finalScore, testDate, center, preferences
       </div>
 
       {/* ── 2×2 stat grid ────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.25rem" }}>
+      <div className="stats-2col">
         <StatCard
           eyebrowText="Estimated Rank"
           title="Across all BITSAT candidates"

@@ -56,7 +56,7 @@ function HistogramChart({
     activeIdx !== null && activeIdx > NUM_BUCKETS * 0.75 ? "right" : "left";
 
   return (
-    <div style={{ width: "100%", overflowX: "auto" }}>
+    <div className="histogram-svg-wrapper">
       <svg
         viewBox={`0 0 ${totalW} ${chartH + 20}`}
         style={{ width: "100%", minWidth: `${totalW}px`, display: "block", cursor: "default" }}
@@ -389,14 +389,7 @@ export function ScoreHistogram({
   return (
     <div style={{ width: "100%" }}>
       {/* Tab bar */}
-      <div style={{
-        display: "flex", gap: "0.25rem",
-        background: C.rustLight,
-        borderRadius: "8px",
-        padding: "0.25rem",
-        width: "fit-content",
-        marginBottom: "1.25rem",
-      }}>
+      <div className="histogram-tabs">
         <button style={tabStyle(tab === "all")} onClick={() => setTab("all")}>
           All submissions
         </button>
