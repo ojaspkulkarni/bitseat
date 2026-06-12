@@ -525,7 +525,6 @@ function Home() {
         </h2>
         <div className="grid-auto">
           <AnalyticsCard title="Score Distribution" subtitle="Visualize how students are scoring across shifts." illustration={<ScoreDistributionIllustration />} />
-          <AnalyticsCard title="Shift Analysis" subtitle="Understand relative shift difficulty using verified data." illustration={<ShiftDifficultyIllustration />} />
           <AnalyticsCard title="Percentile Estimates" subtitle="Dynamic predictions powered by live submissions." illustration={<LivePercentileIllustration />} />
         </div>
       </section>
@@ -805,20 +804,6 @@ function AnalyticsCard({ title, subtitle, illustration }: { title: string; subti
     </div>
   );
 }
-
-/* ─── Analytics illustrations ───────────────────── */
-const ShiftDifficultyIllustration = () => (
-  <svg width="180" height="64" viewBox="0 0 180 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {[{ x: 20, h: 38, label: "S1" }, { x: 60, h: 28, label: "S2" }, { x: 100, h: 44, label: "S3" }, { x: 140, h: 32, label: "S4" }].map(({ x, h, label }) => (
-      <g key={label}>
-        <rect x={x} y={54 - h} width={22} height={h} rx="3" fill={C.rust} opacity="0.3" />
-        <text x={x + 11} y={62} textAnchor="middle" fontSize="7" fill={C.inkFaint} fontFamily="Inter, sans-serif">{label}</text>
-      </g>
-    ))}
-    <line x1="14" y1="22" x2="168" y2="22" stroke={C.rust} strokeWidth="1.2" strokeDasharray="4 3" opacity="0.6" />
-    <text x="170" y="25" fontSize="7" fill={C.rust} fontFamily="Inter, sans-serif" opacity="0.8">avg</text>
-  </svg>
-);
 
 const LivePercentileIllustration = () => (
   <svg width="180" height="64" viewBox="0 0 180 64" fill="none" xmlns="http://www.w3.org/2000/svg">
