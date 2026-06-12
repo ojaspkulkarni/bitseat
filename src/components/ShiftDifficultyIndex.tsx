@@ -1,4 +1,4 @@
-import { C, font, eyebrow } from "./stats.tokens";
+import { C, font } from "./stats.tokens";
 import { Skeleton } from "./stats.primitives";
 
 /* ─── Known 2026 shifts ──────────────────────────── */
