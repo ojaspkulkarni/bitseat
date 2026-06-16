@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { type Branch, estimatedRank, estimatedPercentile } from "../data/cutoffs";
 import { C, font, eyebrow } from "./stats.tokens";
