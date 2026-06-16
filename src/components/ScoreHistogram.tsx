@@ -338,6 +338,8 @@ export function ScoreHistogram({
   session2ShiftLabel,
   otherShiftScoresByShift,
   myScore,
+  mySession1Score,
+  mySession2Score,
   loading,
   shareClicks,
   shareUrl,
@@ -349,6 +351,8 @@ export function ScoreHistogram({
   session2ShiftLabel: string | null;
   otherShiftScoresByShift: Record<string, number[]>;
   myScore: number | null;
+  mySession1Score: number | null;
+  mySession2Score: number | null;
   loading: boolean;
   shareClicks: number;
   shareUrl: string;
@@ -417,7 +421,7 @@ export function ScoreHistogram({
       {tab === "s1" && (
         <HistogramChart
           allScores={session1ShiftScores}
-          myScore={myScore}
+          myScore={mySession1Score ?? myScore}
           label={session1ShiftLabel ?? "Session 1"}
         />
       )}
@@ -425,7 +429,7 @@ export function ScoreHistogram({
       {tab === "s2" && (
         <HistogramChart
           allScores={session2ShiftScores}
-          myScore={myScore}
+          myScore={mySession2Score ?? myScore}
           label={session2ShiftLabel ?? "Session 2"}
         />
       )}

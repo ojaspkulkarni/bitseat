@@ -194,7 +194,7 @@ function Home() {
         async () => {
           const { data: authData } = await supabase.auth.getUser();
           const currentUser = authData.user;
-          if (currentUser) await loadExistingScore(currentUser);
+          if (currentUser) await loadExistingScore(currentUser, true);
         }
       )
       .subscribe();
@@ -205,7 +205,7 @@ function Home() {
     };
   }, []);
 
-  async function loadExistingScore(currentUser: any) {
+  async function loadExistingScore(currentUser: any, isRealtimeRefresh = false) {
     try {
       const { data: links, error: fetchError } = await supabase
         .from("score_users")
@@ -229,18 +229,19 @@ function Home() {
         const latest = rows[0];
         setActiveScoreId(latest.id);
         setData(scoreRowToData(latest));
-        // If session1_shift is already set for this scorecard, skip the shift-setup screen
-        if (latest.session1_shift) {
-          setShiftConfirmed(true);
-        } else {
-          setShiftConfirmed(false);
+        // Only update shiftConfirmed/prefConfirmed on initial load or explicit actions,
+        // NOT on background realtime refreshes (which would reset the shift-setup screen).
+        if (!isRealtimeRefresh) {
+          if (latest.session1_shift) {
+            setShiftConfirmed(true);
+          } else {
+            setShiftConfirmed(false);
+          }
+          const loaded = await loadPreferences(currentUser.id);
+          if (loaded && loaded.length > 0) {
+            setPrefConfirmed(true);
+          }
         }
-        const loaded = await loadPreferences(currentUser.id);
-        // If they already have saved preferences, skip the setup screen
-        if (loaded && loaded.length > 0) {
-          setPrefConfirmed(true);
-        }
-        // Otherwise: preference-setup screen will show automatically
       }
     } finally {
       setLoading(false);
@@ -459,6 +460,8 @@ function Home() {
 
           <StatsSection
             finalScore={data.finalScore}
+            session1Score={data.session1Score}
+            session2Score={data.session2Score}
             session1Shift={myScores.find((r) => r.id === activeScoreId)?.session1_shift ?? null}
             session2Shift={data.session2Shift}
             center={data.center}

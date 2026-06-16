@@ -33,6 +33,8 @@ function predictCollege(score: number, preferences: Branch[]): Branch | null {
 /* ─── Types ──────────────────────────────────────── */
 interface Props {
   finalScore: number | null;
+  session1Score: number | null;
+  session2Score: number | null;
   session1Shift: string | null;
   session2Shift: string | null;
   center: string | null;
@@ -54,8 +56,19 @@ interface StatsState {
 }
 
 /* ─── Main component ─────────────────────────────── */
+/* Alias iDZ Ramtekdi 2 and iDZ Ramtekdi 3 to the same centre */
+function normaliseCenter(raw: string | null): string {
+  if (!raw) return "";
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/idz ramtekdi [23]/i, "idz ramtekdi");
+}
+
 export default function StatsSection({
   finalScore,
+  session1Score,
+  session2Score,
   session1Shift,
   session2Shift,
   center,
@@ -123,9 +136,8 @@ export default function StatsSection({
       .map((r: any) => r.session2_score as number)
       .filter((s) => typeof s === "number");
 
-    const normalise = (s: string | null) => (s ?? "").trim().toLowerCase();
     const centerScores = rows
-      .filter((r: any) => center && normalise(r.center) === normalise(center))
+      .filter((r: any) => center && normaliseCenter(r.center) === normaliseCenter(center))
       .map((r: any) => r.final_score as number)
       .filter((s) => typeof s === "number");
 
@@ -154,8 +166,8 @@ export default function StatsSection({
   const popRank = finalScore !== null ? estimatedRank(finalScore) : null;
   const popPct  = finalScore !== null ? estimatedPercentile(finalScore) : null;
 
-  const s1Pct = computePercentile(score, stats.session1ShiftScores);
-  const s2Pct = computePercentile(score, stats.session2ShiftScores);
+  const s1Pct = computePercentile(session1Score ?? score, stats.session1ShiftScores);
+  const s2Pct = computePercentile(session2Score ?? score, stats.session2ShiftScores);
 
   const centerPct = computePercentile(score, stats.centerScores);
   const usedPreference = college && preferences.some(
@@ -352,6 +364,8 @@ export default function StatsSection({
             session2ShiftScores={stats.session2ShiftScores}
             otherShiftScoresByShift={stats.otherShiftScoresByShift}
             myScore={finalScore}
+            mySession1Score={session1Score}
+            mySession2Score={session2Score}
             loading={stats.loading}
             shareClicks={stats.referralCount}
             shareUrl={`${window.location.origin}/r/${userId ?? ""}`}
