@@ -89,6 +89,13 @@ export default function StatsSection({
   useEffect(() => {
     if (finalScore === null) return;
 
+    // Guards against a stale response (e.g. from before the user switched
+    // scorecards, or from this effect's own teardown) overwriting fresher
+    // data that already landed. Without this, two overlapping loadStats()
+    // calls can resolve out of order and the histogram appears to change
+    // unpredictably when switching between scorecards.
+    let isCurrent = true;
+
     // Define loadStats INSIDE the effect so it always closes over the
     // current prop values (session1Shift, session2Shift, center, userId).
     // This prevents stale-closure bugs where the realtime callback would
@@ -100,6 +107,8 @@ export default function StatsSection({
         supabase.from("scores").select("final_score, session1_score, session2_score, session1_shift, session2_shift, center"),
         supabase.from("referrals").select("share_clicks").eq("user_id", userId ?? "").maybeSingle(),
       ]);
+
+      if (!isCurrent) return; // a newer request already started; drop this result
 
       const rows = scoresRes.data;
       if (scoresRes.error || !rows) {
@@ -174,7 +183,10 @@ export default function StatsSection({
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      isCurrent = false;
+      supabase.removeChannel(channel);
+    };
   }, [finalScore, session1Shift, session2Shift, center, userId, refreshKey]);
 
   const score = finalScore ?? 0;

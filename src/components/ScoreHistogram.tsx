@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { C, font } from "./stats.tokens";
 import { Skeleton } from "./stats.primitives";
 
@@ -27,6 +27,34 @@ function HistogramChart({
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [pinnedIdx, setPinnedIdx] = useState<number | null>(null);
   const activeIdx = pinnedIdx ?? hoveredIdx;
+
+  // Whether to show the "scrollable" fade hint on the right edge. Only true
+  // when the chart actually overflows its container AND there's still more
+  // to scroll to — otherwise the fade would permanently hide whatever sits
+  // in the last ~10% (e.g. a high score's own marker), even after the user
+  // has scrolled all the way to see it.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [showScrollFade, setShowScrollFade] = useState(false);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    function updateFade() {
+      if (!el) return;
+      const needsScroll = el.scrollWidth > el.clientWidth + 1;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+      setShowScrollFade(needsScroll && !atEnd);
+    }
+
+    updateFade();
+    el.addEventListener("scroll", updateFade, { passive: true });
+    window.addEventListener("resize", updateFade);
+    return () => {
+      el.removeEventListener("scroll", updateFade);
+      window.removeEventListener("resize", updateFade);
+    };
+  }, []);
 
   // Build buckets — only count valid numbers
   const buckets = Array.from({ length: NUM_BUCKETS }, (_, i) => ({
@@ -66,14 +94,23 @@ function HistogramChart({
   const markerBarH = myBucketIdx >= 0
     ? Math.max(1, Math.round((buckets[myBucketIdx].count / maxCount) * chartH))
     : 0;
-  const markerTickTop = Math.max(2, chartH - markerBarH - 8); // label top, min y=2
+  // Marker: tick above the bar — clamp so the label's glyph (not just its
+  // baseline) never exits the viewBox. A floor of 2 wasn't enough: at
+  // fontSize 3.5 the ascent pushes the top of the digits a couple of units
+  // above the baseline, so anyone whose bucket is the tallest bar (i.e. the
+  // most common score — true for a lot of people) had their own score
+  // clipped off the top of the chart.
+  const markerTickTop = Math.max(4, chartH - markerBarH - 8); // label top
   const markerTickBot = Math.min(chartH - 1, chartH - markerBarH - 2); // line bottom
   const markerX = myBucketIdx >= 0 ? myBucketIdx * (barW + gap) + barW / 2 : 0;
 
   const validSubmissions = allScores.filter((s) => typeof s === "number" && Number.isFinite(s));
 
   return (
-    <div className="histogram-svg-wrapper">
+    <div
+      ref={wrapperRef}
+      className={`histogram-svg-wrapper${showScrollFade ? " histogram-svg-wrapper--fade" : ""}`}
+    >
       <svg
         viewBox={`0 0 ${totalW} ${chartH + 20}`}
         style={{ width: "100%", minWidth: `${totalW}px`, display: "block", cursor: "default" }}

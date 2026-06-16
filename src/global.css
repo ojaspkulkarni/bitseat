@@ -718,22 +718,24 @@ a {
 
 /* ── 34. Histogram SVG — prevent horizontal scroll ─────────
    The SVG sets minWidth to its natural pixel width (~280px).
-   Wrap it so the outer scroll container clips it.            */
+   Wrap it so the outer scroll container clips it.
+
+   NOTE: the fade-out mask is a *scroll hint*, not pure decoration —
+   it paints directly over the real bars/marker/score label. It must
+   only be active when there's genuinely more content to scroll to.
+   `.histogram-svg-wrapper--fade` is added/removed in ScoreHistogram.tsx
+   based on actual scroll position, so a high score's "Your score"
+   marker (or anything else near the right edge) isn't permanently
+   faded out just because it happens to sit in the last ~10%.        */
 .histogram-svg-wrapper {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  /* Show a subtle fade hint that it's scrollable */
-  -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
-  mask-image: linear-gradient(to right, black 90%, transparent 100%);
 }
 
-/* When content fits, remove the mask */
-@media (min-width: 600px) {
-  .histogram-svg-wrapper {
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
+.histogram-svg-wrapper.histogram-svg-wrapper--fade {
+  -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+  mask-image: linear-gradient(to right, black 90%, transparent 100%);
 }
 
 /* ── 35. Results nav — 3-item action row on mobile ─────────

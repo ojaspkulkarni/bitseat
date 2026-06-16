@@ -147,6 +147,11 @@ function Home() {
   const [myScores, setMyScores] = useState<ScoreRow[]>([]);
   // id of the scorecard currently shown on the results page
   const [activeScoreId, setActiveScoreId] = useState<string | null>(null);
+  // Mirrors activeScoreId for use inside the realtime callback below, which
+  // is wired up once on mount and would otherwise see a stale (always-null)
+  // value of activeScoreId via closure.
+  const activeScoreIdRef = useRef<string | null>(null);
+  useEffect(() => { activeScoreIdRef.current = activeScoreId; }, [activeScoreId]);
 
   const [preferences, setPreferences] = useState<Branch[]>([]);
   // Whether the user has explicitly confirmed their preferences (seen the setup screen)
@@ -229,10 +234,19 @@ function Home() {
       setMyScores(rows);
 
       if (rows.length > 0) {
-        const latest = rows[0];
-        setActiveScoreId(latest.id);
-        setData(scoreRowToData(latest));
-        // shiftConfirmed is derived from activeRow.session1_shift — no setter needed.
+        // On a realtime refresh, keep whatever scorecard the user is already
+        // looking at — don't snap them back to "latest" just because some
+        // unrelated insert happened elsewhere on the site. (activeScoreIdRef
+        // is used here, not the `activeScoreId` state value, because this
+        // function is invoked from a realtime callback wired up once on
+        // mount — reading the state variable directly would be stale.)
+        const currentId = activeScoreIdRef.current;
+        const stillExists = isRealtimeRefresh && currentId && rows.some((r) => r.id === currentId);
+        const nextActive = stillExists ? rows.find((r) => r.id === currentId)! : rows[0];
+
+        setActiveScoreId(nextActive.id);
+        setData(scoreRowToData(nextActive));
+
         // Only restore prefConfirmed on non-realtime loads (initial auth / explicit upload).
         if (!isRealtimeRefresh) {
           const loaded = await loadPreferences(currentUser.id);
