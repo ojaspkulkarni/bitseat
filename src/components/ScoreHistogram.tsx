@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { C, font } from "./stats.tokens";
 import { Skeleton } from "./stats.primitives";
 
@@ -27,34 +27,6 @@ function HistogramChart({
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [pinnedIdx, setPinnedIdx] = useState<number | null>(null);
   const activeIdx = pinnedIdx ?? hoveredIdx;
-
-  // Whether to show the "scrollable" fade hint on the right edge. Only true
-  // when the chart actually overflows its container AND there's still more
-  // to scroll to — otherwise the fade would permanently hide whatever sits
-  // in the last ~10% (e.g. a high score's own marker), even after the user
-  // has scrolled all the way to see it.
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const [showScrollFade, setShowScrollFade] = useState(false);
-
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-
-    function updateFade() {
-      if (!el) return;
-      const needsScroll = el.scrollWidth > el.clientWidth + 1;
-      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
-      setShowScrollFade(needsScroll && !atEnd);
-    }
-
-    updateFade();
-    el.addEventListener("scroll", updateFade, { passive: true });
-    window.addEventListener("resize", updateFade);
-    return () => {
-      el.removeEventListener("scroll", updateFade);
-      window.removeEventListener("resize", updateFade);
-    };
-  }, []);
 
   // Build buckets — only count valid numbers
   const buckets = Array.from({ length: NUM_BUCKETS }, (_, i) => ({
@@ -107,10 +79,7 @@ function HistogramChart({
   const validSubmissions = allScores.filter((s) => typeof s === "number" && Number.isFinite(s));
 
   return (
-    <div
-      ref={wrapperRef}
-      className={`histogram-svg-wrapper${showScrollFade ? " histogram-svg-wrapper--fade" : ""}`}
-    >
+    <div className="histogram-svg-wrapper">
       <svg
         viewBox={`0 0 ${totalW} ${chartH + 20}`}
         style={{ width: "100%", minWidth: `${totalW}px`, display: "block", cursor: "default" }}

@@ -372,19 +372,29 @@ function Home() {
     }
   }
 
-  async function saveSession1Shift(scoreId: string, session1Shift: string) {
-    const { error } = await supabase
+  // Ask → write to Supabase → verify it's actually there → only then stop
+  // asking. Returns true only if Supabase confirms the row now has the
+  // value (handles RLS silently blocking the write: 0 rows updated, no
+  // thrown error — `.update()` alone won't catch that, `.select()` will).
+  async function saveSession1Shift(scoreId: string, session1Shift: string): Promise<boolean> {
+    const { data, error } = await supabase
       .from("scores")
       .update({ session1_shift: session1Shift })
-      .eq("id", scoreId);
-    if (error) console.error("Failed to save session1_shift:", error);
-    else {
-      // Update local state so stats reflect the new shift immediately
-      setData((d) => d ? { ...d } : d);
-      setMyScores((rows) =>
-        rows.map((r) => r.id === scoreId ? { ...r, session1_shift: session1Shift } : r)
+      .eq("id", scoreId)
+      .select("id, session1_shift");
+
+    if (error || !data || data.length === 0) {
+      console.error(
+        "session1_shift was not saved to Supabase:",
+        error ?? "update affected 0 rows — check the RLS UPDATE policy on `scores`"
       );
+      return false;
     }
+
+    setMyScores((rows) =>
+      rows.map((r) => (r.id === scoreId ? { ...r, session1_shift: data[0].session1_shift } : r))
+    );
+    return true;
   }
 
   /* ── Initial loading ──────────────────────────── */
@@ -415,8 +425,10 @@ function Home() {
         session2Shift={data.session2Shift}
         candidateName={data.candidateName ? toTitleCase(data.candidateName) : ""}
         onDone={async (session1Shift) => {
-          if (activeScoreId) await saveSession1Shift(activeScoreId, session1Shift);
-          // shiftConfirmed derives from myScores — updated by saveSession1Shift
+          if (!activeScoreId) return false;
+          return await saveSession1Shift(activeScoreId, session1Shift);
+          // shiftConfirmed derives from myScores — updated by saveSession1Shift,
+          // but only once Supabase has actually confirmed the write.
         }}
       />
     );

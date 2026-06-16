@@ -22,11 +22,23 @@ function formatShift(raw: string): string {
 interface Props {
   session2Shift: string | null;
   candidateName: string;
-  onDone: (session1Shift: string) => void;
+  onDone: (session1Shift: string) => Promise<boolean>;
 }
 
 export default function ShiftSetup({ session2Shift, candidateName, onDone }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
+
+  async function handleContinue() {
+    if (!selected || saving) return;
+    setSaving(true);
+    setError(false);
+    const ok = await onDone(selected);
+    setSaving(false);
+    if (!ok) setError(true);
+    // On success the parent switches views away from this screen.
+  }
 
   const primaryBtn: React.CSSProperties = {
     display: "inline-flex",
@@ -35,12 +47,12 @@ export default function ShiftSetup({ session2Shift, candidateName, onDone }: Pro
     padding: "0.85rem 2rem",
     borderRadius: "8px",
     border: "none",
-    background: selected ? C.rust : C.borderMid,
-    color: selected ? "#fff" : C.inkFaint,
+    background: selected && !saving ? C.rust : C.borderMid,
+    color: selected && !saving ? "#fff" : C.inkFaint,
     fontFamily: font.sans,
     fontWeight: 600,
     fontSize: "1rem",
-    cursor: selected ? "pointer" : "not-allowed",
+    cursor: selected && !saving ? "pointer" : "not-allowed",
     width: "100%",
     transition: "background 0.15s, color 0.15s",
   };
@@ -119,12 +131,22 @@ export default function ShiftSetup({ session2Shift, candidateName, onDone }: Pro
           })}
         </div>
 
+        {error && (
+          <p style={{
+            color: C.rustDark, fontSize: "0.85rem", margin: "0 0 0.85rem",
+            background: C.rustLight, border: `1px solid ${C.rust}`,
+            borderRadius: "8px", padding: "0.65rem 0.85rem",
+          }}>
+            Couldn't save that — please check your connection and try again.
+          </p>
+        )}
+
         <button
           style={primaryBtn}
-          disabled={!selected}
-          onClick={() => { if (selected) onDone(selected); }}
+          disabled={!selected || saving}
+          onClick={handleContinue}
         >
-          Continue
+          {saving ? "Saving…" : "Continue"}
         </button>
 
       </div>
