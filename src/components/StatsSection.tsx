@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { type Branch, estimatedRank, estimatedPercentile } from "../data/cutoffs";
 import { C, font, eyebrow } from "./stats.tokens";
@@ -20,8 +20,6 @@ function computePercentile(myScore: number, allScores: number[]): number {
   if (allScores.length === 0) return 0;
   const below = allScores.filter((s) => s < myScore).length;
   const raw = Math.round((below / allScores.length) * 100);
-  // With very few submissions it's possible to score "0th" (everyone ties or you're last).
-  // Show at least 1st so the display isn't meaninglessly confusing.
   return Math.max(raw, 1);
 }
 
@@ -35,7 +33,8 @@ function predictCollege(score: number, preferences: Branch[]): Branch | null {
 /* ─── Types ──────────────────────────────────────── */
 interface Props {
   finalScore: number | null;
-  testDate: string | null;
+  session1Shift: string | null;
+  session2Shift: string | null;
   center: string | null;
   preferences: Branch[];
   userId: string | null;
@@ -45,18 +44,30 @@ interface Props {
 interface StatsState {
   loading: boolean;
   allScores: number[];
-  shiftScores: number[];
+  // Scores from people who share the same S1 or S2 shift as this user
+  session1ShiftScores: number[];
+  session2ShiftScores: number[];
   centerScores: number[];
   referralCount: number;
+  // For the "Other shifts" tab: all shift→scores except the user's own two shifts
   otherShiftScoresByShift: Record<string, number[]>;
 }
 
 /* ─── Main component ─────────────────────────────── */
-export default function StatsSection({ finalScore, testDate, center, preferences, userId, refreshKey = 0 }: Props) {
+export default function StatsSection({
+  finalScore,
+  session1Shift,
+  session2Shift,
+  center,
+  preferences,
+  userId,
+  refreshKey = 0,
+}: Props) {
   const [stats, setStats] = useState<StatsState>({
     loading: true,
     allScores: [],
-    shiftScores: [],
+    session1ShiftScores: [],
+    session2ShiftScores: [],
     centerScores: [],
     referralCount: 0,
     otherShiftScoresByShift: {},
@@ -76,19 +87,23 @@ export default function StatsSection({ finalScore, testDate, center, preferences
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [finalScore, testDate, center, refreshKey]);
+  }, [finalScore, session1Shift, session2Shift, center, refreshKey]);
 
   async function loadStats() {
     setStats((s) => ({ ...s, loading: true }));
 
     const [scoresRes, referralsRes] = await Promise.all([
-      supabase.from("scores").select("final_score, session1_score, session2_score, test_date, center, user_id"),
+      supabase.from("scores").select("final_score, session1_score, session2_score, session1_shift, session2_shift, center"),
       supabase.from("referrals").select("share_clicks").eq("user_id", userId ?? "").maybeSingle(),
     ]);
 
     const rows = scoresRes.data;
     if (scoresRes.error || !rows) {
-      setStats({ loading: false, allScores: [], shiftScores: [], centerScores: [], referralCount: 0, otherShiftScoresByShift: {}});
+      setStats({
+        loading: false, allScores: [], session1ShiftScores: [],
+        session2ShiftScores: [], centerScores: [], referralCount: 0,
+        otherShiftScoresByShift: {},
+      });
       return;
     }
 
@@ -96,9 +111,16 @@ export default function StatsSection({ finalScore, testDate, center, preferences
       .map((r: any) => r.final_score as number)
       .filter((s) => typeof s === "number");
 
-    const shiftScores = rows
-      .filter((r: any) => testDate && r.test_date === testDate)
-      .map((r: any) => r.final_score as number)
+    // Session 1 shift percentile: scores of everyone who sat the same S1 shift
+    const session1ShiftScores = rows
+      .filter((r: any) => session1Shift && r.session1_shift === session1Shift)
+      .map((r: any) => r.session1_score as number)
+      .filter((s) => typeof s === "number");
+
+    // Session 2 shift percentile: scores of everyone who sat the same S2 shift
+    const session2ShiftScores = rows
+      .filter((r: any) => session2Shift && r.session2_shift === session2Shift)
+      .map((r: any) => r.session2_score as number)
       .filter((s) => typeof s === "number");
 
     const normalise = (s: string | null) => (s ?? "").trim().toLowerCase();
@@ -107,27 +129,34 @@ export default function StatsSection({ finalScore, testDate, center, preferences
       .map((r: any) => r.final_score as number)
       .filter((s) => typeof s === "number");
 
-    // Build per-shift map excluding the user's own shift
+    // Build per-shift map for "Other shifts" — final scores grouped by session2_shift,
+    // excluding the user's own two shifts
+    const myShifts = new Set([session1Shift, session2Shift].filter(Boolean));
     const otherShiftScoresByShift: Record<string, number[]> = {};
     for (const r of rows) {
-      if (!r.test_date || r.test_date === testDate) continue;
+      const shiftKey = r.session2_shift;
+      if (!shiftKey || myShifts.has(shiftKey)) continue;
       if (typeof r.final_score !== "number") continue;
-      if (!otherShiftScoresByShift[r.test_date]) {
-        otherShiftScoresByShift[r.test_date] = [];
-      }
-      otherShiftScoresByShift[r.test_date].push(r.final_score);
+      if (!otherShiftScoresByShift[shiftKey]) otherShiftScoresByShift[shiftKey] = [];
+      otherShiftScoresByShift[shiftKey].push(r.final_score);
     }
 
     const referralCount = referralsRes.data?.share_clicks ?? 0;
 
-    setStats({ loading: false, allScores, shiftScores, centerScores, referralCount, otherShiftScoresByShift});
+    setStats({
+      loading: false, allScores, session1ShiftScores, session2ShiftScores,
+      centerScores, referralCount, otherShiftScoresByShift,
+    });
   }
 
   const score = finalScore ?? 0;
   const college = finalScore !== null ? predictCollege(finalScore, preferences) : null;
   const popRank = finalScore !== null ? estimatedRank(finalScore) : null;
   const popPct  = finalScore !== null ? estimatedPercentile(finalScore) : null;
-  const shiftPct = computePercentile(score, stats.shiftScores);
+
+  const s1Pct = computePercentile(score, stats.session1ShiftScores);
+  const s2Pct = computePercentile(score, stats.session2ShiftScores);
+
   const centerPct = computePercentile(score, stats.centerScores);
   const usedPreference = college && preferences.some(
     (p) => p.campus === college.campus && p.specialization === college.specialization
@@ -155,7 +184,7 @@ export default function StatsSection({ finalScore, testDate, center, preferences
                 <Skeleton />
               ) : college ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                  <span style={{ fontFamily: font.serif, fontSize: "clamp(1.9rem, 3vw, 2.6rem)", color: C.ink, lineHeight: 1.1 }}>
+                  <span style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: "clamp(1.9rem, 3vw, 2.6rem)", color: C.ink, lineHeight: 1.1 }}>
                     BITS {college.campus}
                   </span>
                   <span style={{ fontFamily: font.sans, fontSize: "1rem", color: C.inkMid, lineHeight: 1.4 }}>
@@ -178,7 +207,7 @@ export default function StatsSection({ finalScore, testDate, center, preferences
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                  <span style={{ fontFamily: font.serif, fontSize: "clamp(1.9rem, 3vw, 2.6rem)", color: C.inkMid, lineHeight: 1.1 }}>
+                  <span style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: "clamp(1.9rem, 3vw, 2.6rem)", color: C.inkMid, lineHeight: 1.1 }}>
                     No match yet
                   </span>
                   <span style={{ fontFamily: font.sans, fontSize: "0.92rem", color: C.inkFaint }}>
@@ -192,11 +221,11 @@ export default function StatsSection({ finalScore, testDate, center, preferences
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "flex-end", flexShrink: 0 }}>
                 <div style={{ textAlign: "right" }}>
                   <p style={{ fontFamily: font.sans, fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.inkFaint, margin: "0 0 0.2rem" }}>2025 cutoff</p>
-                  <p style={{ fontFamily: font.serif, fontSize: "1.6rem", color: C.ink, margin: 0, lineHeight: 1 }}>{college.baseline2025}</p>
+                  <p style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: "1.6rem", color: C.ink, margin: 0, lineHeight: 1 }}>{college.baseline2025}</p>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <p style={{ fontFamily: font.sans, fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: C.inkFaint, margin: "0 0 0.2rem" }}>Your score</p>
-                  <p style={{ fontFamily: font.serif, fontSize: "1.6rem", color: C.rust, margin: 0, lineHeight: 1 }}>{finalScore}</p>
+                  <p style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: "1.6rem", color: C.rust, margin: 0, lineHeight: 1 }}>{finalScore}</p>
                 </div>
                 <p style={{ fontFamily: font.sans, fontSize: "0.75rem", color: C.inkFaint, margin: 0, textAlign: "right" }}>
                   {usedPreference ? "From your saved preferences" : "Highest branch you clear"}
@@ -207,7 +236,7 @@ export default function StatsSection({ finalScore, testDate, center, preferences
         </div>
       </div>
 
-      {/* ── 2×2 stat grid ────────────────────────── */}
+      {/* ── Stat grid ─────────────────────────────── */}
       <div className="stats-2col">
         <StatCard
           eyebrowText="Estimated Rank"
@@ -243,21 +272,49 @@ export default function StatsSection({ finalScore, testDate, center, preferences
           )}
         </StatCard>
 
+        {/* Session 1 shift percentile */}
         <StatCard
-          eyebrowText="Shift Percentile"
-          title={testDate ? formatShift(testDate) : "Your shift"}
+          eyebrowText="Session 1 Shift"
+          title={session1Shift ? formatShift(session1Shift) : "Not set"}
           footer={
-            !stats.loading && stats.shiftScores.length >= 2
-              ? <ThinDataNote count={stats.shiftScores.length} context="in your shift" />
+            !stats.loading && stats.session1ShiftScores.length >= 2
+              ? <ThinDataNote count={stats.session1ShiftScores.length} context="in this shift" />
               : null
           }
         >
-          {stats.loading ? <Skeleton /> : stats.shiftScores.length < 2 ? (
+          {stats.loading ? <Skeleton /> : !session1Shift ? (
             <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
-              Not enough submissions from your shift yet.
+              Session 1 shift not set.
+            </span>
+          ) : stats.session1ShiftScores.length < 2 ? (
+            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
+              Not enough submissions from this shift yet.
             </span>
           ) : (
-            <BigStat value={shiftPct} suffix="th" sub={`of ${stats.shiftScores.length} in shift`} />
+            <BigStat value={s1Pct} suffix="th" sub={`of ${stats.session1ShiftScores.length} in shift`} />
+          )}
+        </StatCard>
+
+        {/* Session 2 shift percentile */}
+        <StatCard
+          eyebrowText="Session 2 Shift"
+          title={session2Shift ? formatShift(session2Shift) : "Not set"}
+          footer={
+            !stats.loading && stats.session2ShiftScores.length >= 2
+              ? <ThinDataNote count={stats.session2ShiftScores.length} context="in this shift" />
+              : null
+          }
+        >
+          {stats.loading ? <Skeleton /> : !session2Shift ? (
+            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
+              Session 2 shift not available.
+            </span>
+          ) : stats.session2ShiftScores.length < 2 ? (
+            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
+              Not enough submissions from this shift yet.
+            </span>
+          ) : (
+            <BigStat value={s2Pct} suffix="th" sub={`of ${stats.session2ShiftScores.length} in shift`} />
           )}
         </StatCard>
 
@@ -289,7 +346,10 @@ export default function StatsSection({ finalScore, testDate, center, preferences
           </p>
           <ScoreHistogram
             allScores={stats.allScores}
-            shiftScores={stats.shiftScores}
+            session1ShiftLabel={session1Shift ? formatShift(session1Shift) : null}
+            session2ShiftLabel={session2Shift ? formatShift(session2Shift) : null}
+            session1ShiftScores={stats.session1ShiftScores}
+            session2ShiftScores={stats.session2ShiftScores}
             otherShiftScoresByShift={stats.otherShiftScoresByShift}
             myScore={finalScore}
             loading={stats.loading}

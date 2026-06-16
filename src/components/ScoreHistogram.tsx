@@ -266,7 +266,6 @@ function ShareGate({
         </p>
       </div>
 
-      {/* Progress dots */}
       <div style={{ display: "flex", gap: "0.5rem" }}>
         {Array.from({ length: needed }).map((_, i) => (
           <div key={i} style={{
@@ -300,7 +299,6 @@ function ShareGate({
           Share your link
         </button>
 
-        {/* Copy fallback — always shown */}
         <button
           onClick={async () => {
             await navigator.clipboard.writeText(shareUrl);
@@ -334,7 +332,10 @@ function ShareGate({
 /* ─── Main export ────────────────────────────────── */
 export function ScoreHistogram({
   allScores,
-  shiftScores,
+  session1ShiftScores,
+  session2ShiftScores,
+  session1ShiftLabel,
+  session2ShiftLabel,
   otherShiftScoresByShift,
   myScore,
   loading,
@@ -342,14 +343,18 @@ export function ScoreHistogram({
   shareUrl,
 }: {
   allScores: number[];
-  shiftScores: number[];
+  session1ShiftScores: number[];
+  session2ShiftScores: number[];
+  session1ShiftLabel: string | null;
+  session2ShiftLabel: string | null;
   otherShiftScoresByShift: Record<string, number[]>;
   myScore: number | null;
   loading: boolean;
   shareClicks: number;
   shareUrl: string;
 }) {
-  const [tab, setTab] = useState<"all" | "shift" | "other">("all");
+  type Tab = "all" | "s1" | "s2" | "other";
+  const [tab, setTab] = useState<Tab>("all");
   const [selectedOtherShift, setSelectedOtherShift] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const unlocked = shareClicks >= 3;
@@ -374,7 +379,7 @@ export function ScoreHistogram({
     fontFamily: font.sans,
     fontSize: "0.78rem",
     fontWeight: 600,
-    padding: "0.4rem 1rem",
+    padding: "0.4rem 0.85rem",
     borderRadius: "6px",
     border: "none",
     cursor: "pointer",
@@ -393,8 +398,11 @@ export function ScoreHistogram({
         <button style={tabStyle(tab === "all")} onClick={() => setTab("all")}>
           All submissions
         </button>
-        <button style={tabStyle(tab === "shift")} onClick={() => setTab("shift")}>
-          Your shift
+        <button style={tabStyle(tab === "s1")} onClick={() => setTab("s1")}>
+          {session1ShiftLabel ?? "Session 1"}
+        </button>
+        <button style={tabStyle(tab === "s2")} onClick={() => setTab("s2")}>
+          {session2ShiftLabel ?? "Session 2"}
         </button>
         <button style={tabStyle(tab === "other")} onClick={() => setTab("other")}>
           {!unlocked && <LockIcon />}
@@ -406,13 +414,24 @@ export function ScoreHistogram({
         <HistogramChart allScores={allScores} myScore={myScore} label="All submissions" />
       )}
 
-      {tab === "shift" && (
-        <HistogramChart allScores={shiftScores} myScore={myScore} label="Your shift" />
+      {tab === "s1" && (
+        <HistogramChart
+          allScores={session1ShiftScores}
+          myScore={myScore}
+          label={session1ShiftLabel ?? "Session 1"}
+        />
+      )}
+
+      {tab === "s2" && (
+        <HistogramChart
+          allScores={session2ShiftScores}
+          myScore={myScore}
+          label={session2ShiftLabel ?? "Session 2"}
+        />
       )}
 
       {tab === "other" && (
         <div style={{ position: "relative" }}>
-          {/* Shift selector + chart — always rendered so blur looks right */}
           <div style={{
             filter: unlocked ? "none" : "blur(4px)",
             pointerEvents: unlocked ? "auto" : "none",
@@ -420,7 +439,6 @@ export function ScoreHistogram({
           }}>
             {otherShifts.length > 0 ? (
               <>
-                {/* Shift picker */}
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
                   {otherShifts.map((shift) => (
                     <button

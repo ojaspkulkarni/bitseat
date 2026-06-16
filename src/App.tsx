@@ -6,6 +6,7 @@ import { supabase } from "./lib/supabase";
 import FoundersNote from "./pages/FoundersNote";
 import ReferralLanding from "./pages/ReferralLanding";
 import PreferenceSetup from "./components/PreferenceSetup";
+import ShiftSetup from "./components/ShiftSetup";
 import StatsSection from "./components/StatsSection";
 import type { Branch } from "./data/cutoffs";
 import { BRANCHES } from "./data/cutoffs";
@@ -108,13 +109,14 @@ export default function App() {
   );
 }
 
-type AppView = "loading" | "landing" | "preference-setup" | "results";
+type AppView = "loading" | "landing" | "shift-setup" | "preference-setup" | "results";
 
 type ScoreRow = {
   id: string;
   candidate_name: string | null;
   application_number: string;
-  test_date: string | null;
+  session1_shift: string | null;
+  session2_shift: string | null;
   center: string | null;
   session1_score: number | null;
   session2_score: number | null;
@@ -126,7 +128,7 @@ function scoreRowToData(row: ScoreRow): ExtractedBitsatData {
   return {
     candidateName: row.candidate_name,
     applicationNumber: row.application_number,
-    testDate: row.test_date,
+    session2Shift: row.session2_shift,
     center: row.center,
     session1Score: row.session1_score,
     session2Score: row.session2_score,
@@ -147,6 +149,8 @@ function Home() {
   const [activeScoreId, setActiveScoreId] = useState<string | null>(null);
 
   const [preferences, setPreferences] = useState<Branch[]>([]);
+  // Whether the user has confirmed their Session 1 shift (shown after PDF upload)
+  const [shiftConfirmed, setShiftConfirmed] = useState(false);
   // Whether the user has explicitly confirmed their preferences (seen the setup screen)
   const [prefConfirmed, setPrefConfirmed] = useState(false);
   const [statsRefreshKey, setStatsRefreshKey] = useState(0);
@@ -155,6 +159,8 @@ function Home() {
     ? "loading"
     : !user || !data
     ? "landing"
+    : !shiftConfirmed
+    ? "shift-setup"
     : !prefConfirmed
     ? "preference-setup"
     : "results";
@@ -165,6 +171,9 @@ function Home() {
     link.rel = "stylesheet";
     document.head.appendChild(link);
 
+    // onAuthStateChange always fires immediately with the current session state
+    // (INITIAL_SESSION event), so we don't need a separate getUser() call.
+    // Having both would race and call loadExistingScore twice for signed-in users.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         const currentUser = session?.user ?? null;
@@ -176,16 +185,6 @@ function Home() {
         }
       }
     );
-
-    supabase.auth.getUser().then(async ({ data: authData }) => {
-      const currentUser = authData.user;
-      setUser(currentUser);
-      if (currentUser) {
-        await loadExistingScore(currentUser);
-      } else {
-        setLoading(false);
-      }
-    });
 
     const channel = supabase
       .channel("app-scores-realtime")
@@ -230,6 +229,12 @@ function Home() {
         const latest = rows[0];
         setActiveScoreId(latest.id);
         setData(scoreRowToData(latest));
+        // If session1_shift is already set for this scorecard, skip the shift-setup screen
+        if (latest.session1_shift) {
+          setShiftConfirmed(true);
+        } else {
+          setShiftConfirmed(false);
+        }
         const loaded = await loadPreferences(currentUser.id);
         // If they already have saved preferences, skip the setup screen
         if (loaded && loaded.length > 0) {
@@ -245,6 +250,7 @@ function Home() {
   function selectScore(row: ScoreRow) {
     setActiveScoreId(row.id);
     setData(scoreRowToData(row));
+    setShiftConfirmed(!!row.session1_shift);
     setStatsRefreshKey((k) => k + 1);
   }
 
@@ -284,6 +290,7 @@ function Home() {
     await supabase.auth.signOut();
     setData(null);
     setPreferences([]);
+    setShiftConfirmed(false);
     setPrefConfirmed(false);
     setMyScores([]);
     setActiveScoreId(null);
@@ -314,11 +321,12 @@ function Home() {
           .insert({
             application_number: parsed.applicationNumber,
             candidate_name: parsed.candidateName,
-            test_date: parsed.testDate,
+            session2_shift: parsed.session2Shift,
             center: parsed.center,
             session1_score: parsed.session1Score,
             session2_score: parsed.session2Score,
             final_score: parsed.finalScore,
+            // session1_shift is null until the user picks it in ShiftSetup
           })
           .select("*")
           .single();
@@ -339,8 +347,15 @@ function Home() {
       if (existing) {
         const loaded = await loadPreferences(user.id);
         if (loaded && loaded.length > 0) setPrefConfirmed(true);
+        // If session1_shift already set on the existing row, skip shift-setup
+        if (scoreRow.session1_shift) {
+          setShiftConfirmed(true);
+        } else {
+          setShiftConfirmed(false);
+        }
       } else {
-        // New scorecard → always show preference setup
+        // New scorecard → show shift-setup then preference setup
+        setShiftConfirmed(false);
         setPrefConfirmed(false);
       }
     } catch (err) {
@@ -348,6 +363,21 @@ function Home() {
       setError(err instanceof Error ? err.message : "Unknown parsing error.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveSession1Shift(scoreId: string, session1Shift: string) {
+    const { error } = await supabase
+      .from("scores")
+      .update({ session1_shift: session1Shift })
+      .eq("id", scoreId);
+    if (error) console.error("Failed to save session1_shift:", error);
+    else {
+      // Update local state so stats reflect the new shift immediately
+      setData((d) => d ? { ...d } : d);
+      setMyScores((rows) =>
+        rows.map((r) => r.id === scoreId ? { ...r, session1_shift: session1Shift } : r)
+      );
     }
   }
 
@@ -369,6 +399,20 @@ function Home() {
           Loading…
         </div>
       </div>
+    );
+  }
+
+  /* ── Shift setup screen ───────────────────────── */
+  if (view === "shift-setup" && data) {
+    return (
+      <ShiftSetup
+        session2Shift={data.session2Shift}
+        candidateName={data.candidateName ? toTitleCase(data.candidateName) : ""}
+        onDone={async (session1Shift) => {
+          if (activeScoreId) await saveSession1Shift(activeScoreId, session1Shift);
+          setShiftConfirmed(true);
+        }}
+      />
     );
   }
 
@@ -415,7 +459,8 @@ function Home() {
 
           <StatsSection
             finalScore={data.finalScore}
-            testDate={data.testDate}
+            session1Shift={myScores.find((r) => r.id === activeScoreId)?.session1_shift ?? null}
+            session2Shift={data.session2Shift}
             center={data.center}
             preferences={preferences}
             userId={user?.id ?? null}
@@ -440,7 +485,7 @@ function Home() {
           </div>
 
           {/* ── Candidate metadata — very end ─────────── */}
-          {(data.candidateName || data.testDate || data.center) && (
+          {(data.candidateName || data.session2Shift || data.center) && (
             <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "2rem", display: "flex", alignItems: "baseline", gap: "1rem", flexWrap: "wrap" }}>
               {data.candidateName && (
                 <p style={{ fontFamily: font.serif, fontSize: "1rem", color: C.inkFaint, fontWeight: 400, margin: 0 }}>
@@ -448,7 +493,7 @@ function Home() {
                 </p>
               )}
               <p style={{ color: C.inkFaint, fontSize: "0.82rem", margin: 0, display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                {data.testDate && <span>{formatShift(data.testDate)}</span>}
+                {data.session2Shift && <span>{formatShift(data.session2Shift)}</span>}
                 {data.center && <span style={{ paddingLeft: "0.6rem", borderLeft: `1px solid ${C.border}` }}>{data.center}</span>}
               </p>
             </div>
@@ -740,7 +785,7 @@ function ResultsNavMenu({
                           {row.candidate_name ? toTitleCase(row.candidate_name) : `App ${row.application_number}`}
                         </span>
                         <span style={{ display: "block", color: C.inkFaint, fontSize: "0.72rem", marginTop: "0.1rem" }}>
-                          {row.test_date ? formatShift(row.test_date) : ""}
+                          {row.session2_shift ? formatShift(row.session2_shift) : ""}
                         </span>
                       </span>
                       <span style={{ fontFamily: font.serif, fontSize: "1.1rem", color: C.rust, flexShrink: 0 }}>

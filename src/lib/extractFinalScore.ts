@@ -5,7 +5,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 export interface ExtractedBitsatData {
   candidateName: string | null;
   applicationNumber: string | null;
-  testDate: string | null;
+  session2Shift: string | null;   // extracted from PDF (only S2 date is printed)
   center: string | null;
   session1Score: number | null;
   session2Score: number | null;
@@ -42,7 +42,8 @@ export async function extractBitsatData(file: File): Promise<ExtractedBitsatData
     /([A-Z]{2,}(?:\s+[A-Z]{2,})+)\s+\d{8}/
   );
   const applicationNumber = extract(/\b(\d{8})\b/);
-  const testDate = extract(/\d{8}\s+([A-Za-z0-9_]+)/i);
+  // The PDF only prints the Session 2 shift date (e.g. "25May2026_S2")
+  const session2Shift = extract(/\d{8}\s+([A-Za-z0-9_]+)/i);
   const center = extract(/[A-Za-z0-9_]+\s+(iON.+?)\s+\d+\s+Two/i);
 
   const session1Score = scoreBlockMatch ? parseInt(scoreBlockMatch[1], 10) : null;
@@ -74,7 +75,7 @@ export async function extractBitsatData(file: File): Promise<ExtractedBitsatData
   const data: ExtractedBitsatData = {
     candidateName,
     applicationNumber,
-    testDate,
+    session2Shift,
     center,
     session1Score,
     session2Score,
