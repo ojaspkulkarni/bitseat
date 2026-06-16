@@ -149,11 +149,14 @@ function Home() {
   const [activeScoreId, setActiveScoreId] = useState<string | null>(null);
 
   const [preferences, setPreferences] = useState<Branch[]>([]);
-  // Whether the user has confirmed their Session 1 shift (shown after PDF upload)
-  const [shiftConfirmed, setShiftConfirmed] = useState(false);
   // Whether the user has explicitly confirmed their preferences (seen the setup screen)
   const [prefConfirmed, setPrefConfirmed] = useState(false);
   const [statsRefreshKey, setStatsRefreshKey] = useState(0);
+
+  // Derive shift confirmation directly from the active score row in myScores.
+  // This is the single source of truth — never a separate boolean that can drift.
+  const activeRow = myScores.find((r) => r.id === activeScoreId) ?? null;
+  const shiftConfirmed = !!activeRow?.session1_shift;
 
   const view: AppView = loading
     ? "loading"
@@ -229,14 +232,9 @@ function Home() {
         const latest = rows[0];
         setActiveScoreId(latest.id);
         setData(scoreRowToData(latest));
-        // Only update shiftConfirmed/prefConfirmed on initial load or explicit actions,
-        // NOT on background realtime refreshes (which would reset the shift-setup screen).
+        // shiftConfirmed is derived from activeRow.session1_shift — no setter needed.
+        // Only restore prefConfirmed on non-realtime loads (initial auth / explicit upload).
         if (!isRealtimeRefresh) {
-          if (latest.session1_shift) {
-            setShiftConfirmed(true);
-          } else {
-            setShiftConfirmed(false);
-          }
           const loaded = await loadPreferences(currentUser.id);
           if (loaded && loaded.length > 0) {
             setPrefConfirmed(true);
@@ -251,7 +249,7 @@ function Home() {
   function selectScore(row: ScoreRow) {
     setActiveScoreId(row.id);
     setData(scoreRowToData(row));
-    setShiftConfirmed(!!row.session1_shift);
+    // shiftConfirmed derives from myScores + activeScoreId — no setter needed
     setStatsRefreshKey((k) => k + 1);
   }
 
@@ -291,7 +289,6 @@ function Home() {
     await supabase.auth.signOut();
     setData(null);
     setPreferences([]);
-    setShiftConfirmed(false);
     setPrefConfirmed(false);
     setMyScores([]);
     setActiveScoreId(null);
@@ -348,15 +345,9 @@ function Home() {
       if (existing) {
         const loaded = await loadPreferences(user.id);
         if (loaded && loaded.length > 0) setPrefConfirmed(true);
-        // If session1_shift already set on the existing row, skip shift-setup
-        if (scoreRow.session1_shift) {
-          setShiftConfirmed(true);
-        } else {
-          setShiftConfirmed(false);
-        }
+        // shiftConfirmed derives from myScores row — no setter needed
       } else {
-        // New scorecard → show shift-setup then preference setup
-        setShiftConfirmed(false);
+        // New scorecard → show preference setup after shift setup completes
         setPrefConfirmed(false);
       }
     } catch (err) {
@@ -411,7 +402,7 @@ function Home() {
         candidateName={data.candidateName ? toTitleCase(data.candidateName) : ""}
         onDone={async (session1Shift) => {
           if (activeScoreId) await saveSession1Shift(activeScoreId, session1Shift);
-          setShiftConfirmed(true);
+          // shiftConfirmed derives from myScores — updated by saveSession1Shift
         }}
       />
     );

@@ -88,6 +88,81 @@ export default function StatsSection({
 
   useEffect(() => {
     if (finalScore === null) return;
+
+    // Define loadStats INSIDE the effect so it always closes over the
+    // current prop values (session1Shift, session2Shift, center, userId).
+    // This prevents stale-closure bugs where the realtime callback would
+    // filter with outdated shift values.
+    async function loadStats() {
+      setStats((s) => ({ ...s, loading: true }));
+
+      const [scoresRes, referralsRes] = await Promise.all([
+        supabase.from("scores").select("final_score, session1_score, session2_score, session1_shift, session2_shift, center"),
+        supabase.from("referrals").select("share_clicks").eq("user_id", userId ?? "").maybeSingle(),
+      ]);
+
+      const rows = scoresRes.data;
+      if (scoresRes.error || !rows) {
+        setStats({
+          loading: false, allScores: [], session1ShiftScores: [],
+          session2ShiftScores: [], centerScores: [], referralCount: 0,
+          otherShiftScoresByShift: {},
+        });
+        return;
+      }
+
+      // Filter helpers — reject anything that isn't a real finite number
+      const toNum = (v: unknown): number | null =>
+        typeof v === "number" && Number.isFinite(v) ? v : null;
+
+      const allScores: number[] = rows
+        .map((r: any) => toNum(r.final_score))
+        .filter((s): s is number => s !== null);
+
+      // S1 shift: collect session1_score from everyone on the same S1 shift
+      const session1ShiftScores: number[] = session1Shift
+        ? rows
+            .filter((r: any) => r.session1_shift === session1Shift)
+            .map((r: any) => toNum(r.session1_score))
+            .filter((s): s is number => s !== null)
+        : [];
+
+      // S2 shift: collect session2_score from everyone on the same S2 shift
+      const session2ShiftScores: number[] = session2Shift
+        ? rows
+            .filter((r: any) => r.session2_shift === session2Shift)
+            .map((r: any) => toNum(r.session2_score))
+            .filter((s): s is number => s !== null)
+        : [];
+
+      const myCenterKey = normaliseCenter(center);
+      const centerScores: number[] = myCenterKey
+        ? rows
+            .filter((r: any) => normaliseCenter(r.center) === myCenterKey)
+            .map((r: any) => toNum(r.final_score))
+            .filter((s): s is number => s !== null)
+        : [];
+
+      // "Other shifts" — final scores by S2 shift key, excluding user's own two shifts
+      const myShifts = new Set([session1Shift, session2Shift].filter(Boolean) as string[]);
+      const otherShiftScoresByShift: Record<string, number[]> = {};
+      for (const r of rows) {
+        const shiftKey: string | null = r.session2_shift;
+        if (!shiftKey || myShifts.has(shiftKey)) continue;
+        const score = toNum(r.final_score);
+        if (score === null) continue;
+        if (!otherShiftScoresByShift[shiftKey]) otherShiftScoresByShift[shiftKey] = [];
+        otherShiftScoresByShift[shiftKey].push(score);
+      }
+
+      const referralCount = referralsRes.data?.share_clicks ?? 0;
+
+      setStats({
+        loading: false, allScores, session1ShiftScores, session2ShiftScores,
+        centerScores, referralCount, otherShiftScoresByShift,
+      });
+    }
+
     loadStats();
 
     const channel = supabase
@@ -100,66 +175,7 @@ export default function StatsSection({
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [finalScore, session1Shift, session2Shift, center, refreshKey]);
-
-  async function loadStats() {
-    setStats((s) => ({ ...s, loading: true }));
-
-    const [scoresRes, referralsRes] = await Promise.all([
-      supabase.from("scores").select("final_score, session1_score, session2_score, session1_shift, session2_shift, center"),
-      supabase.from("referrals").select("share_clicks").eq("user_id", userId ?? "").maybeSingle(),
-    ]);
-
-    const rows = scoresRes.data;
-    if (scoresRes.error || !rows) {
-      setStats({
-        loading: false, allScores: [], session1ShiftScores: [],
-        session2ShiftScores: [], centerScores: [], referralCount: 0,
-        otherShiftScoresByShift: {},
-      });
-      return;
-    }
-
-    const allScores = rows
-      .map((r: any) => r.final_score as number)
-      .filter((s) => typeof s === "number");
-
-    // Session 1 shift percentile: scores of everyone who sat the same S1 shift
-    const session1ShiftScores = rows
-      .filter((r: any) => session1Shift && r.session1_shift === session1Shift)
-      .map((r: any) => r.session1_score as number)
-      .filter((s) => typeof s === "number");
-
-    // Session 2 shift percentile: scores of everyone who sat the same S2 shift
-    const session2ShiftScores = rows
-      .filter((r: any) => session2Shift && r.session2_shift === session2Shift)
-      .map((r: any) => r.session2_score as number)
-      .filter((s) => typeof s === "number");
-
-    const centerScores = rows
-      .filter((r: any) => center && normaliseCenter(r.center) === normaliseCenter(center))
-      .map((r: any) => r.final_score as number)
-      .filter((s) => typeof s === "number");
-
-    // Build per-shift map for "Other shifts" — final scores grouped by session2_shift,
-    // excluding the user's own two shifts
-    const myShifts = new Set([session1Shift, session2Shift].filter(Boolean));
-    const otherShiftScoresByShift: Record<string, number[]> = {};
-    for (const r of rows) {
-      const shiftKey = r.session2_shift;
-      if (!shiftKey || myShifts.has(shiftKey)) continue;
-      if (typeof r.final_score !== "number") continue;
-      if (!otherShiftScoresByShift[shiftKey]) otherShiftScoresByShift[shiftKey] = [];
-      otherShiftScoresByShift[shiftKey].push(r.final_score);
-    }
-
-    const referralCount = referralsRes.data?.share_clicks ?? 0;
-
-    setStats({
-      loading: false, allScores, session1ShiftScores, session2ShiftScores,
-      centerScores, referralCount, otherShiftScoresByShift,
-    });
-  }
+  }, [finalScore, session1Shift, session2Shift, center, userId, refreshKey]);
 
   const score = finalScore ?? 0;
   const college = finalScore !== null ? predictCollege(finalScore, preferences) : null;

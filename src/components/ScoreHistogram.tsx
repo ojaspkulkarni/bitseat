@@ -2,7 +2,19 @@ import { useState } from "react";
 import { C, font } from "./stats.tokens";
 import { Skeleton } from "./stats.primitives";
 
-/* ─── Shared histogram renderer ─────────────────── */
+/* ─── Constants ──────────────────────────────────── */
+const BUCKET = 10;
+const MIN_SCORE = 100;
+const MAX_SCORE = 400; // exclusive upper bound — covers score of 390 in bucket [390,400)
+const NUM_BUCKETS = (MAX_SCORE - MIN_SCORE) / BUCKET; // 30, all integers
+
+/** Place a score into its bucket index. Returns -1 if out of range. */
+function bucketIdx(score: number): number {
+  if (score < MIN_SCORE || score >= MAX_SCORE) return -1;
+  return Math.floor((score - MIN_SCORE) / BUCKET);
+}
+
+/* ─── Histogram renderer ─────────────────────────── */
 function HistogramChart({
   allScores,
   myScore,
@@ -12,36 +24,33 @@ function HistogramChart({
   myScore: number | null;
   label: string;
 }) {
-  const BUCKET = 10;
-  const MIN_SCORE = 100;
-  const MAX_SCORE = 390;
-  const NUM_BUCKETS = Math.ceil((MAX_SCORE - MIN_SCORE) / BUCKET);
-
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [pinnedIdx, setPinnedIdx] = useState<number | null>(null);
   const activeIdx = pinnedIdx ?? hoveredIdx;
 
+  // Build buckets — only count valid numbers
   const buckets = Array.from({ length: NUM_BUCKETS }, (_, i) => ({
     lo: MIN_SCORE + i * BUCKET,
     hi: MIN_SCORE + (i + 1) * BUCKET,
     count: 0,
   }));
-
   for (const s of allScores) {
-    const idx = Math.floor((s - MIN_SCORE) / BUCKET);
-    if (idx >= 0 && idx < NUM_BUCKETS) buckets[idx].count++;
+    if (typeof s !== "number" || !Number.isFinite(s)) continue;
+    const idx = bucketIdx(s);
+    if (idx >= 0) buckets[idx].count++;
   }
 
   const maxCount = Math.max(...buckets.map((b) => b.count), 1);
-  const myBucketIdx =
-    myScore !== null ? Math.floor((myScore - MIN_SCORE) / BUCKET) : -1;
+  const myBucketIdx = myScore !== null && typeof myScore === "number"
+    ? bucketIdx(myScore)
+    : -1;
 
   const chartH = 72;
   const barW = 6;
   const gap = 1;
   const totalW = NUM_BUCKETS * (barW + gap) - gap;
 
-  if (allScores.length < 1) {
+  if (allScores.filter((s) => typeof s === "number" && Number.isFinite(s)).length < 1) {
     return (
       <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
         Not enough submissions to plot a distribution yet.
@@ -50,10 +59,18 @@ function HistogramChart({
   }
 
   const activeBucket = activeIdx !== null ? buckets[activeIdx] : null;
-  const tooltipX =
-    activeIdx !== null ? activeIdx * (barW + gap) + barW / 2 : 0;
-  const tooltipAnchor =
-    activeIdx !== null && activeIdx > NUM_BUCKETS * 0.75 ? "right" : "left";
+  const tooltipX = activeIdx !== null ? activeIdx * (barW + gap) + barW / 2 : 0;
+  const tooltipAnchor = activeIdx !== null && activeIdx > NUM_BUCKETS * 0.75 ? "right" : "left";
+
+  // Marker: tick above the bar — clamp so it never exits the viewBox
+  const markerBarH = myBucketIdx >= 0
+    ? Math.max(1, Math.round((buckets[myBucketIdx].count / maxCount) * chartH))
+    : 0;
+  const markerTickTop = Math.max(2, chartH - markerBarH - 8); // label top, min y=2
+  const markerTickBot = Math.min(chartH - 1, chartH - markerBarH - 2); // line bottom
+  const markerX = myBucketIdx >= 0 ? myBucketIdx * (barW + gap) + barW / 2 : 0;
+
+  const validSubmissions = allScores.filter((s) => typeof s === "number" && Number.isFinite(s));
 
   return (
     <div className="histogram-svg-wrapper">
@@ -63,6 +80,7 @@ function HistogramChart({
         aria-label={`${label} score distribution histogram`}
         onMouseLeave={() => setHoveredIdx(null)}
       >
+        {/* Hit targets — full-height invisible rects for hover/click */}
         {buckets.map((_, i) => (
           <rect
             key={`hit-${i}`}
@@ -77,6 +95,7 @@ function HistogramChart({
           />
         ))}
 
+        {/* Bars */}
         {buckets.map((b, i) => {
           const barH = Math.max(1, Math.round((b.count / maxCount) * chartH));
           const x = i * (barW + gap);
@@ -89,7 +108,7 @@ function HistogramChart({
               x={x} y={y} width={barW} height={barH}
               fill={isMe ? C.rust : C.borderMid}
               rx={1}
-              opacity={b.count === 0 ? 0.2 : isActive ? 1 : 0.85}
+              opacity={b.count === 0 ? 0.15 : isActive ? 1 : 0.85}
               style={{ transition: "opacity 0.1s" }}
               stroke={isActive ? (isMe ? C.rustDark : C.inkMid) : "none"}
               strokeWidth={isActive ? 1 : 0}
@@ -97,30 +116,25 @@ function HistogramChart({
           );
         })}
 
-        {myScore !== null && myBucketIdx >= 0 && (() => {
-          const x = myBucketIdx * (barW + gap) + barW / 2;
-          const barH = Math.max(
-            1,
-            Math.round(((buckets[myBucketIdx]?.count ?? 0) / maxCount) * chartH)
-          );
-          return (
-            <g style={{ pointerEvents: "none" }}>
-              <line
-                x1={x} y1={chartH - barH - 2}
-                x2={x} y2={chartH - barH - 6}
-                stroke={C.rust} strokeWidth={1.5}
-              />
-              <text
-                x={x} y={chartH - barH - 8}
-                fontFamily={font.sans} fontSize={3.5} fontWeight={700}
-                fill={C.rust} textAnchor="middle"
-              >
-                {myScore}
-              </text>
-            </g>
-          );
-        })()}
+        {/* "Your score" marker — only when score is in range */}
+        {myScore !== null && myBucketIdx >= 0 && (
+          <g style={{ pointerEvents: "none" }}>
+            <line
+              x1={markerX} y1={markerTickBot}
+              x2={markerX} y2={markerTickTop + 4}
+              stroke={C.rust} strokeWidth={1.5}
+            />
+            <text
+              x={markerX} y={markerTickTop}
+              fontFamily={font.sans} fontSize={3.5} fontWeight={700}
+              fill={C.rust} textAnchor="middle"
+            >
+              {myScore}
+            </text>
+          </g>
+        )}
 
+        {/* Hover tooltip */}
         {activeBucket && activeIdx !== null && (
           <g style={{ pointerEvents: "none" }}>
             <line
@@ -131,10 +145,9 @@ function HistogramChart({
               const boxW = 52;
               const boxH = 22;
               const boxY = 4;
-              const boxX =
-                tooltipAnchor === "right"
-                  ? tooltipX - boxW - 4
-                  : tooltipX + 4;
+              const boxX = tooltipAnchor === "right"
+                ? tooltipX - boxW - 4
+                : tooltipX + 4;
               return (
                 <g>
                   <rect x={boxX} y={boxY} width={boxW} height={boxH} rx={3}
@@ -159,10 +172,11 @@ function HistogramChart({
           </g>
         )}
 
+        {/* X-axis labels */}
         {[150, 200, 250, 300, 350].map((s) => (
           <text
             key={s}
-            x={((s - MIN_SCORE) / BUCKET) * (barW + gap)}
+            x={bucketIdx(s) * (barW + gap)}
             y={chartH + 10}
             fontFamily={font.sans} fontSize={4} fill={C.inkFaint}
           >
@@ -179,7 +193,7 @@ function HistogramChart({
           </span>
         </div>
         <span style={{ fontFamily: font.sans, fontSize: "0.72rem", color: C.inkFaint, marginLeft: "auto" }}>
-          {allScores.length} submission{allScores.length !== 1 ? "s" : ""} · 10-point bands
+          {validSubmissions.length} submission{validSubmissions.length !== 1 ? "s" : ""} · 10-point bands
         </span>
       </div>
     </div>
@@ -414,22 +428,29 @@ export function ScoreHistogram({
         </button>
       </div>
 
+      {/* All submissions — marker is final score */}
       {tab === "all" && (
-        <HistogramChart allScores={allScores} myScore={myScore} label="All submissions" />
+        <HistogramChart
+          allScores={allScores}
+          myScore={myScore}
+          label="All submissions"
+        />
       )}
 
+      {/* Session 1 shift — population is S1 scores, marker is S1 score only */}
       {tab === "s1" && (
         <HistogramChart
           allScores={session1ShiftScores}
-          myScore={mySession1Score ?? myScore}
+          myScore={mySession1Score}
           label={session1ShiftLabel ?? "Session 1"}
         />
       )}
 
+      {/* Session 2 shift — population is S2 scores, marker is S2 score only */}
       {tab === "s2" && (
         <HistogramChart
           allScores={session2ShiftScores}
-          myScore={mySession2Score ?? myScore}
+          myScore={mySession2Score}
           label={session2ShiftLabel ?? "Session 2"}
         />
       )}
