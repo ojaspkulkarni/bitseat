@@ -108,6 +108,13 @@ export function ShiftDifficultyIndex({ rows, loading }: Props) {
   const range = Math.max(maxIndex - minIndex, 1);
 
   function renderGroup(groupRows: ShiftDifficultyRow[], title: string) {
+    // Rank the shifts that have enough data, hardest (highest index) first;
+    // shifts still awaiting submissions stay in chronological order at the end.
+    const eligible = groupRows.filter((r) => r.index !== null).sort((a, b) => b.index! - a.index!);
+    const pending = groupRows.filter((r) => r.index === null);
+    const ranked = [...eligible, ...pending];
+    const rankOf = new Map(eligible.map((r, i) => [r.key, i + 1]));
+
     return (
       <div>
         <p style={{
@@ -118,10 +125,11 @@ export function ShiftDifficultyIndex({ rows, loading }: Props) {
           {title}
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          {groupRows.map((r) => {
+          {ranked.map((r) => {
             const hasData = r.index !== null;
             const diff = difficultyLabel(r.index);
             const pct = hasData ? ((r.index! - minIndex) / range) * 100 : 0;
+            const rank = rankOf.get(r.key);
             return (
               <div
                 key={r.key}
@@ -135,6 +143,13 @@ export function ShiftDifficultyIndex({ rows, loading }: Props) {
                   background: r.isYours ? C.rustLight : "#fff",
                 }}
               >
+                {hasData && (
+                  <div style={{ width: "1.6rem", flexShrink: 0, textAlign: "center" }}>
+                    <span style={{ fontFamily: font.sans, fontSize: "0.78rem", fontWeight: 700, color: C.inkFaint }}>
+                      #{rank}
+                    </span>
+                  </div>
+                )}
                 <div style={{ width: "9rem", flexShrink: 0 }}>
                   <span style={{ fontFamily: font.sans, fontSize: "0.85rem", fontWeight: r.isYours ? 600 : 500, color: C.ink }}>
                     {r.label}

@@ -4,6 +4,7 @@ import { type Branch, estimatedRank, estimatedPercentile } from "../data/cutoffs
 import { C, font, eyebrow } from "./stats.tokens";
 import { StatCard, BigStat, Skeleton, ThinDataNote, RankTooltip, PercentileTooltip } from "./stats.primitives";
 import { ScoreHistogram } from "./ScoreHistogram";
+import { ShiftDifficultyIndex, computeShiftDifficulty, type ShiftDifficultyRow } from "./ShiftDifficultyIndex";
 
 /* ─── Helpers ────────────────────────────────────── */
 function formatShift(raw: string): string {
@@ -16,11 +17,26 @@ function formatShift(raw: string): string {
   return raw.replace(/_/g, " · ");
 }
 
-function computePercentile(myScore: number, allScores: number[]): number {
-  if (allScores.length === 0) return 0;
-  const below = allScores.filter((s) => s < myScore).length;
-  const raw = Math.round((below / allScores.length) * 100);
-  return Math.max(raw, 1);
+/** Competition ranking: rank 1 = highest score, ties share the same rank
+ *  (i.e. rank = 1 + count of scores strictly greater than yours). Used for
+ *  small samples (e.g. a single exam center) where a percentile is
+ *  statistically noisy and easy to misread as a rank anyway — "1st" out of
+ *  4 reads very differently depending on whether it's a rank or percentile,
+ *  so for small groups we just show the literal rank instead. */
+function computeRank(myScore: number, allScores: number[]): { rank: number; total: number } {
+  const total = allScores.length;
+  if (total === 0) return { rank: 0, total: 0 };
+  const ahead = allScores.filter((s) => s > myScore).length;
+  return { rank: ahead + 1, total };
+}
+
+function ordinalSuffix(n: number): string {
+  const j = n % 10;
+  const k = n % 100;
+  if (j === 1 && k !== 11) return "st";
+  if (j === 2 && k !== 12) return "nd";
+  if (j === 3 && k !== 13) return "rd";
+  return "th";
 }
 
 function predictCollege(score: number, preferences: Branch[]): Branch | null {
@@ -53,6 +69,7 @@ interface StatsState {
   referralCount: number;
   // For the "Other shifts" tab: all shift→scores except the user's own two shifts
   otherShiftScoresByShift: Record<string, number[]>;
+  shiftDifficulty: ShiftDifficultyRow[];
 }
 
 /* ─── Main component ─────────────────────────────── */
@@ -84,6 +101,7 @@ export default function StatsSection({
     centerScores: [],
     referralCount: 0,
     otherShiftScoresByShift: {},
+    shiftDifficulty: [],
   });
 
   useEffect(() => {
@@ -115,7 +133,7 @@ export default function StatsSection({
         setStats({
           loading: false, allScores: [], session1ShiftScores: [],
           session2ShiftScores: [], centerScores: [], referralCount: 0,
-          otherShiftScoresByShift: {},
+          otherShiftScoresByShift: {}, shiftDifficulty: [],
         });
         return;
       }
@@ -166,9 +184,11 @@ export default function StatsSection({
 
       const referralCount = referralsRes.data?.share_clicks ?? 0;
 
+      const shiftDifficulty = computeShiftDifficulty(rows, session1Shift, session2Shift);
+
       setStats({
         loading: false, allScores, session1ShiftScores, session2ShiftScores,
-        centerScores, referralCount, otherShiftScoresByShift,
+        centerScores, referralCount, otherShiftScoresByShift, shiftDifficulty,
       });
     }
 
@@ -194,10 +214,7 @@ export default function StatsSection({
   const popRank = finalScore !== null ? estimatedRank(finalScore) : null;
   const popPct  = finalScore !== null ? estimatedPercentile(finalScore) : null;
 
-  const s1Pct = computePercentile(session1Score ?? score, stats.session1ShiftScores);
-  const s2Pct = computePercentile(session2Score ?? score, stats.session2ShiftScores);
-
-  const centerPct = computePercentile(score, stats.centerScores);
+  const centerRank = computeRank(score, stats.centerScores);
   const usedPreference = college && preferences.some(
     (p) => p.campus === college.campus && p.specialization === college.specialization
   );
@@ -312,54 +329,8 @@ export default function StatsSection({
           )}
         </StatCard>
 
-        {/* Session 1 shift percentile */}
         <StatCard
-          eyebrowText="Session 1 Shift"
-          title={session1Shift ? formatShift(session1Shift) : "Not set"}
-          footer={
-            !stats.loading && stats.session1ShiftScores.length >= 2
-              ? <ThinDataNote count={stats.session1ShiftScores.length} context="in this shift" />
-              : null
-          }
-        >
-          {stats.loading ? <Skeleton /> : !session1Shift ? (
-            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
-              Session 1 shift not set.
-            </span>
-          ) : stats.session1ShiftScores.length < 2 ? (
-            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
-              Not enough submissions from this shift yet.
-            </span>
-          ) : (
-            <BigStat value={s1Pct} suffix="th" sub={`of ${stats.session1ShiftScores.length} in shift`} />
-          )}
-        </StatCard>
-
-        {/* Session 2 shift percentile */}
-        <StatCard
-          eyebrowText="Session 2 Shift"
-          title={session2Shift ? formatShift(session2Shift) : "Not set"}
-          footer={
-            !stats.loading && stats.session2ShiftScores.length >= 2
-              ? <ThinDataNote count={stats.session2ShiftScores.length} context="in this shift" />
-              : null
-          }
-        >
-          {stats.loading ? <Skeleton /> : !session2Shift ? (
-            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
-              Session 2 shift not available.
-            </span>
-          ) : stats.session2ShiftScores.length < 2 ? (
-            <span style={{ fontFamily: font.sans, fontSize: "0.9rem", color: C.inkFaint }}>
-              Not enough submissions from this shift yet.
-            </span>
-          ) : (
-            <BigStat value={s2Pct} suffix="th" sub={`of ${stats.session2ShiftScores.length} in shift`} />
-          )}
-        </StatCard>
-
-        <StatCard
-          eyebrowText="Center Percentile"
+          eyebrowText="Center Rank"
           title={center ?? "Your exam center"}
           footer={
             !stats.loading && stats.centerScores.length >= 2
@@ -372,9 +343,24 @@ export default function StatsSection({
               Not enough submissions from your center yet.
             </span>
           ) : (
-            <BigStat value={centerPct} suffix="th" sub={`of ${stats.centerScores.length} at center`} />
+            <BigStat
+              value={centerRank.rank}
+              suffix={ordinalSuffix(centerRank.rank)}
+              sub={`of ${centerRank.total} at center`}
+            />
           )}
         </StatCard>
+      </div>
+
+      {/* ── Shift Difficulty ──────────────────────── */}
+      <div style={{ marginTop: "1.25rem" }}>
+        <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "2.25rem" }}>
+          <p style={{ ...eyebrow, marginBottom: "0.35rem" }}>Shift Difficulty</p>
+          <p style={{ fontFamily: font.sans, fontSize: "0.82rem", fontWeight: 600, color: C.inkMid, margin: "0 0 1.25rem", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
+            How your shift compares to others
+          </p>
+          <ShiftDifficultyIndex rows={stats.shiftDifficulty} loading={stats.loading} />
+        </div>
       </div>
 
       {/* ── Score Distribution ────────────────────── */}
