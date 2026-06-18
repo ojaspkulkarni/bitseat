@@ -39,6 +39,15 @@ export function ShiftDifficultyIndex({ rows, loading }: Props) {
     sessionRows[0]?.key;
   const [selectedKey, setSelectedKey] = useState<string | undefined>(defaultShift);
 
+  // If selectedKey is stale (rows just loaded after initial render), resolve to a valid key
+  const resolvedKey = selectedKey && sessionRows.some((r) => r.key === selectedKey)
+    ? selectedKey
+    : sessionRows.find((r) => r.isYours)?.key
+      ?? sessionRows.find((r) => r.index !== null)?.key
+      ?? sessionRows[0]?.key;
+
+  const selectedRow = sessionRows.find((r) => r.key === resolvedKey) ?? null;
+
   // When switching sessions, reset selected shift
   function switchSession(s: 1 | 2) {
     setActiveSession(s);
@@ -49,8 +58,6 @@ export function ShiftDifficultyIndex({ rows, loading }: Props) {
       nextRows[0]?.key;
     setSelectedKey(next);
   }
-
-  const selectedRow = sessionRows.find((r) => r.key === selectedKey) ?? null;
 
   const maxAbsDelta = Math.max(
     6,
@@ -73,9 +80,9 @@ export function ShiftDifficultyIndex({ rows, loading }: Props) {
     );
   }
 
-  const hasData = selectedRow?.index !== null;
+  const hasData = selectedRow !== null && selectedRow.index !== null;
   const diff = difficultyLabel(selectedRow?.index ?? null);
-  const delta = hasData ? selectedRow!.index! - 100 : 0;
+  const delta = hasData ? (selectedRow!.index! - 100) : 0;
   const barPct = hasData ? (Math.abs(delta) / maxAbsDelta) * 50 : 0;
   const isHarder = delta >= 0;
   const color = barColor(selectedRow?.index ?? null);
@@ -118,7 +125,7 @@ export function ShiftDifficultyIndex({ rows, loading }: Props) {
       {/* Shift pills */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
         {sessionRows.map((r) => {
-          const isSelected = r.key === selectedKey;
+          const isSelected = r.key === resolvedKey;
           return (
             <button
               key={r.key}
