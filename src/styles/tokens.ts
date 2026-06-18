@@ -33,7 +33,7 @@ export const font = {
   sans: "'Inter', ui-sans-serif, system-ui, sans-serif",
 };
 
-export const primaryBtn: React.CSSProperties = {
+export const primaryBtn = {
   display: "inline-flex",
   alignItems: "center",
   gap: "0.5rem",
@@ -49,7 +49,7 @@ export const primaryBtn: React.CSSProperties = {
   letterSpacing: "0.01em",
 };
 
-export const ghostBtn: React.CSSProperties = {
+export const ghostBtn = {
   display: "inline-flex",
   alignItems: "center",
   gap: "0.5rem",
@@ -64,7 +64,7 @@ export const ghostBtn: React.CSSProperties = {
   cursor: "pointer",
 };
 
-export const eyebrow: React.CSSProperties = {
+export const eyebrow = {
   fontFamily: font.sans,
   fontSize: "0.7rem",
   fontWeight: 600,

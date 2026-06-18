@@ -129,16 +129,17 @@ function HistogramChart({
             <line
               x1={markerX} y1={markerBarTop}
               x2={markerX} y2={topPad * 0.55}
-              stroke={C.rust} strokeWidth={1} opacity={0.55}
+              stroke={C.rust} strokeWidth={0.6} opacity={0.35}
+              strokeDasharray="1.5 1.5"
             />
             <rect
               x={markerX - 9} y={0} width={18} height={topPad - 2.5} rx={2.5}
-              fill={C.white} stroke={C.rust} strokeWidth={0.6}
+              fill={C.rustLight} stroke={C.rust} strokeWidth={0.4} opacity={0.8}
             />
             <text
               x={markerX} y={topPad - 6.5}
-              fontFamily={font.sans} fontSize={4.4} fontWeight={700}
-              fill={C.rust} textAnchor="middle"
+              fontFamily={font.sans} fontSize={4.4} fontWeight={500}
+              fill={C.rust} textAnchor="middle" opacity={0.75}
             >
               {myScore}
             </text>
