@@ -7,13 +7,18 @@ const GOLD = "#c9922a";
 const GOLD_EMPTY = "#e8d5b0";
 
 function computeStars(rows: ShiftDifficultyRow[]): Map<string, number> {
-  const eligible = rows
-    .filter((r) => r.index !== null)
-    .sort((a, b) => a.index! - b.index!);
-  const n = eligible.length;
+  const eligible = rows.filter((r) => r.index !== null);
   const map = new Map<string, number>();
-  eligible.forEach((r, i) => {
-    map.set(r.key, Math.min(5, Math.floor((i / n) * 5) + 1));
+  if (eligible.length === 0) return map;
+
+  const deviations = eligible.map((r) => r.index! - 100);
+  const maxDev = Math.max(...deviations.map(Math.abs));
+
+  eligible.forEach((r) => {
+    const deviation = r.index! - 100;
+    // Scale so that the largest deviation = 5 stars, 0 deviation = 3 stars
+    const raw = maxDev === 0 ? 3 : Math.round((deviation / maxDev) * 2) + 3;
+    map.set(r.key, Math.max(1, Math.min(5, raw)));
   });
   return map;
 }
