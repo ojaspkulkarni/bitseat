@@ -68,15 +68,6 @@ function HistogramChart({
   const tooltipX = activeIdx !== null ? activeIdx * (barW + gap) + barW / 2 : 0;
   const tooltipAnchor = activeIdx !== null && activeIdx > NUM_BUCKETS * 0.75 ? "right" : "left";
 
-  // "Your score" marker — label always sits in the reserved topPad band
-  // above the chart, with a connector line running down to the bar. This
-  // way the label never overlaps or gets clipped by a tall bar.
-  const markerX = myBucketIdx >= 0 ? myBucketIdx * (barW + gap) + barW / 2 : 0;
-  const markerBarH = myBucketIdx >= 0
-    ? Math.max(1, Math.round((buckets[myBucketIdx].count / maxCount) * chartH))
-    : 0;
-  const markerBarTop = topPad + (chartH - markerBarH);
-
   const validSubmissions = allScores.filter((s) => typeof s === "number" && Number.isFinite(s));
 
   return (
