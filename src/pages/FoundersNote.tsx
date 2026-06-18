@@ -1,22 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-
-const C = {
-  cream: "#faf9f5",
-  creamDark: "#f2ede6",
-  rust: "#d77656",
-  ink: "#1C1612",
-  inkMid: "#5A4E44",
-  inkFaint: "#9A8E85",
-  white: "#FFFFFF",
-  border: "rgba(92,70,55,0.12)",
-  borderMid: "rgba(92,70,55,0.20)",
-};
-
-const font = {
-  serif: "'EB Garamond', 'Garamond', 'Georgia', serif",
-  sans: "'Inter', ui-sans-serif, system-ui, sans-serif",
-};
+import { C, font } from "../styles/tokens";
 
 export default function FoundersNote() {
   useEffect(() => {

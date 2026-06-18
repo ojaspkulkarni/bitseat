@@ -1,10 +1,23 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
-import { type Branch, estimatedRank, estimatedPercentile } from "../data/cutoffs";
-import { C, font, eyebrow } from "./stats.tokens";
-import { StatCard, BigStat, Skeleton, ThinDataNote, RankTooltip, PercentileTooltip } from "./stats.primitives";
+import { supabase } from "../../lib/supabase";
+import { type Branch, estimatedRank, estimatedPercentile } from "../../data/cutoffs";
+import { C, font, eyebrow } from "../../styles/tokens";
+import { StatCard, BigStat, Skeleton, ThinDataNote, RankTooltip, PercentileTooltip } from "./primitives";
 import { ScoreHistogram } from "./ScoreHistogram";
-import { ShiftDifficultyIndex, computeShiftDifficulty, type ShiftDifficultyRow } from "./ShiftDifficultyIndex";
+import { ShiftDifficultyIndex } from "../shift/ShiftDifficultyIndex";
+import { computeShiftDifficulty, type ShiftDifficultyRow } from "../shift/shiftDifficulty.helpers";
+
+// Shape of a row from `supabase.from("scores").select(...)` as used in this
+// file's stats query — the client has no generated DB types, so without
+// this the rows would otherwise come back as `any`.
+type ScoreStatsRow = {
+  final_score: number | null;
+  session1_score: number | null;
+  session2_score: number | null;
+  session1_shift: string | null;
+  session2_shift: string | null;
+  center: string | null;
+};
 
 /* ─── Helpers ────────────────────────────────────── */
 function formatShift(raw: string): string {
@@ -143,30 +156,30 @@ export default function StatsSection({
         typeof v === "number" && Number.isFinite(v) ? v : null;
 
       const allScores: number[] = rows
-        .map((r: any) => toNum(r.final_score))
+        .map((r: ScoreStatsRow) => toNum(r.final_score))
         .filter((s): s is number => s !== null);
 
       // S1 shift: collect session1_score from everyone on the same S1 shift
       const session1ShiftScores: number[] = session1Shift
         ? rows
-            .filter((r: any) => r.session1_shift === session1Shift)
-            .map((r: any) => toNum(r.session1_score))
+            .filter((r: ScoreStatsRow) => r.session1_shift === session1Shift)
+            .map((r: ScoreStatsRow) => toNum(r.session1_score))
             .filter((s): s is number => s !== null)
         : [];
 
       // S2 shift: collect session2_score from everyone on the same S2 shift
       const session2ShiftScores: number[] = session2Shift
         ? rows
-            .filter((r: any) => r.session2_shift === session2Shift)
-            .map((r: any) => toNum(r.session2_score))
+            .filter((r: ScoreStatsRow) => r.session2_shift === session2Shift)
+            .map((r: ScoreStatsRow) => toNum(r.session2_score))
             .filter((s): s is number => s !== null)
         : [];
 
       const myCenterKey = normaliseCenter(center);
       const centerScores: number[] = myCenterKey
         ? rows
-            .filter((r: any) => normaliseCenter(r.center) === myCenterKey)
-            .map((r: any) => toNum(r.final_score))
+            .filter((r: ScoreStatsRow) => normaliseCenter(r.center) === myCenterKey)
+            .map((r: ScoreStatsRow) => toNum(r.final_score))
             .filter((s): s is number => s !== null)
         : [];
 

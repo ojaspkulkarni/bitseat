@@ -1,42 +1,6 @@
 import { useState } from "react";
-import { BRANCHES, CAMPUSES, type Branch, type Campus } from "../data/cutoffs";
-
-const C = {
-  cream: "#faf9f5",
-  rust: "#d77656",
-  rustLight: "#f9ede7",
-  rustDark: "#b85e3e",
-  green: "#166534",
-  greenLight: "#f0fdf4",
-  greenBorder: "#bbf7d0",
-  amber: "#92400e",
-  amberLight: "#fffbeb",
-  amberBorder: "#fde68a",
-  red: "#991b1b",
-  redLight: "#fff1f2",
-  redBorder: "#fecdd3",
-  ink: "#1C1612",
-  inkMid: "#5A4E44",
-  inkFaint: "#9A8E85",
-  white: "#FFFFFF",
-  border: "rgba(92,70,55,0.12)",
-  borderMid: "rgba(92,70,55,0.20)",
-};
-
-const font = {
-  serif: "'EB Garamond', 'Garamond', 'Georgia', serif",
-  sans: "'Inter', ui-sans-serif, system-ui, sans-serif",
-};
-
-const eyebrow: React.CSSProperties = {
-  fontFamily: font.sans,
-  fontSize: "0.7rem",
-  fontWeight: 600,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase" as const,
-  color: C.rust,
-  margin: 0,
-};
+import { BRANCHES, CAMPUSES, type Branch, type Campus } from "../../data/cutoffs";
+import { C, font, eyebrow } from "../../styles/tokens";
 
 type Status = "safe" | "close" | "reach" | null;
 function getStatus(score: number | null, cutoff: number): Status {
@@ -80,6 +44,20 @@ export default function PreferenceSetup({ finalScore, candidateName, initialPref
 
   function handleRemove(key: string) {
     setPreferences(preferences.filter((p) => branchKey(p) !== key));
+  }
+
+  function handleMoveUp(index: number) {
+    if (index === 0) return;
+    const next = [...preferences];
+    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+    setPreferences(next);
+  }
+
+  function handleMoveDown(index: number) {
+    if (index === preferences.length - 1) return;
+    const next = [...preferences];
+    [next[index], next[index + 1]] = [next[index + 1], next[index]];
+    setPreferences(next);
   }
 
   const campusBranches = BRANCHES.filter((b) => b.campus === activeTab);
@@ -298,6 +276,44 @@ export default function PreferenceSetup({ finalScore, candidateName, initialPref
                           {cfg.label}
                         </span>
                       )}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flexShrink: 0 }}>
+                        <button
+                          onClick={() => handleMoveUp(i)}
+                          title="Move up"
+                          disabled={i === 0}
+                          style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            width: "20px", height: "16px", borderRadius: "4px",
+                            border: `1px solid ${C.border}`, background: "transparent",
+                            color: i === 0 ? C.inkFaint : C.inkMid,
+                            cursor: i === 0 ? "default" : "pointer",
+                            opacity: i === 0 ? 0.35 : 1,
+                            padding: 0,
+                          }}
+                        >
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 19V5M5 12l7-7 7 7"/>
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleMoveDown(i)}
+                          title="Move down"
+                          disabled={i === preferences.length - 1}
+                          style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            width: "20px", height: "16px", borderRadius: "4px",
+                            border: `1px solid ${C.border}`, background: "transparent",
+                            color: i === preferences.length - 1 ? C.inkFaint : C.inkMid,
+                            cursor: i === preferences.length - 1 ? "default" : "pointer",
+                            opacity: i === preferences.length - 1 ? 0.35 : 1,
+                            padding: 0,
+                          }}
+                        >
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 5v14M5 12l7 7 7-7"/>
+                          </svg>
+                        </button>
+                      </div>
                       <button
                         onClick={() => handleRemove(branchKey(branch))}
                         style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "22px", height: "22px", borderRadius: "5px", border: `1px solid ${C.border}`, background: "transparent", color: "#BE123C", cursor: "pointer", padding: 0, flexShrink: 0 }}

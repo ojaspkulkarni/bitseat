@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { C, font } from "./stats.tokens";
-import { Skeleton } from "./stats.primitives";
+import { C, font } from "../../styles/tokens";
+import { Skeleton } from "./primitives";
 
 /* ─── Constants ──────────────────────────────────── */
 const BUCKET = 10;
@@ -49,6 +49,12 @@ function HistogramChart({
   const barW = 6;
   const gap = 1;
   const totalW = NUM_BUCKETS * (barW + gap) - gap;
+  // Reserve fixed headroom above the chart for the "your score" label, so it
+  // never has to compete for space with a tall bar. Previously the label sat
+  // inside chartH and got clamped/overlapped whenever the bar was near max
+  // height — exactly the case that matters most, since that's usually the
+  // most common score band.
+  const topPad = 14;
 
   if (allScores.filter((s) => typeof s === "number" && Number.isFinite(s)).length < 1) {
     return (
@@ -62,26 +68,21 @@ function HistogramChart({
   const tooltipX = activeIdx !== null ? activeIdx * (barW + gap) + barW / 2 : 0;
   const tooltipAnchor = activeIdx !== null && activeIdx > NUM_BUCKETS * 0.75 ? "right" : "left";
 
-  // Marker: tick above the bar — clamp so it never exits the viewBox
+  // "Your score" marker — label always sits in the reserved topPad band
+  // above the chart, with a connector line running down to the bar. This
+  // way the label never overlaps or gets clipped by a tall bar.
+  const markerX = myBucketIdx >= 0 ? myBucketIdx * (barW + gap) + barW / 2 : 0;
   const markerBarH = myBucketIdx >= 0
     ? Math.max(1, Math.round((buckets[myBucketIdx].count / maxCount) * chartH))
     : 0;
-  // Marker: tick above the bar — clamp so the label's glyph (not just its
-  // baseline) never exits the viewBox. A floor of 2 wasn't enough: at
-  // fontSize 3.5 the ascent pushes the top of the digits a couple of units
-  // above the baseline, so anyone whose bucket is the tallest bar (i.e. the
-  // most common score — true for a lot of people) had their own score
-  // clipped off the top of the chart.
-  const markerTickTop = Math.max(4, chartH - markerBarH - 8); // label top
-  const markerTickBot = Math.min(chartH - 1, chartH - markerBarH - 2); // line bottom
-  const markerX = myBucketIdx >= 0 ? myBucketIdx * (barW + gap) + barW / 2 : 0;
+  const markerBarTop = topPad + (chartH - markerBarH);
 
   const validSubmissions = allScores.filter((s) => typeof s === "number" && Number.isFinite(s));
 
   return (
     <div className="histogram-svg-wrapper">
       <svg
-        viewBox={`0 0 ${totalW} ${chartH + 20}`}
+        viewBox={`0 0 ${totalW} ${topPad + chartH + 20}`}
         style={{ width: "100%", minWidth: `${totalW}px`, display: "block", cursor: "default" }}
         aria-label={`${label} score distribution histogram`}
         onMouseLeave={() => setHoveredIdx(null)}
@@ -91,7 +92,7 @@ function HistogramChart({
           <rect
             key={`hit-${i}`}
             x={i * (barW + gap)}
-            y={0}
+            y={topPad}
             width={barW + gap}
             height={chartH}
             fill="transparent"
@@ -105,7 +106,7 @@ function HistogramChart({
         {buckets.map((b, i) => {
           const barH = Math.max(1, Math.round((b.count / maxCount) * chartH));
           const x = i * (barW + gap);
-          const y = chartH - barH;
+          const y = topPad + chartH - barH;
           const isMe = i === myBucketIdx;
           const isActive = i === activeIdx;
           return (
@@ -126,13 +127,17 @@ function HistogramChart({
         {myScore !== null && myBucketIdx >= 0 && (
           <g style={{ pointerEvents: "none" }}>
             <line
-              x1={markerX} y1={markerTickBot}
-              x2={markerX} y2={markerTickTop + 4}
-              stroke={C.rust} strokeWidth={1.5}
+              x1={markerX} y1={markerBarTop}
+              x2={markerX} y2={topPad * 0.55}
+              stroke={C.rust} strokeWidth={1} opacity={0.55}
+            />
+            <rect
+              x={markerX - 9} y={0} width={18} height={topPad - 2.5} rx={2.5}
+              fill={C.white} stroke={C.rust} strokeWidth={0.6}
             />
             <text
-              x={markerX} y={markerTickTop}
-              fontFamily={font.sans} fontSize={3.5} fontWeight={700}
+              x={markerX} y={topPad - 6.5}
+              fontFamily={font.sans} fontSize={4.4} fontWeight={700}
               fill={C.rust} textAnchor="middle"
             >
               {myScore}
@@ -144,13 +149,13 @@ function HistogramChart({
         {activeBucket && activeIdx !== null && (
           <g style={{ pointerEvents: "none" }}>
             <line
-              x1={tooltipX} y1={0} x2={tooltipX} y2={chartH}
+              x1={tooltipX} y1={topPad} x2={tooltipX} y2={topPad + chartH}
               stroke={C.inkFaint} strokeWidth={0.5} strokeDasharray="2 2" opacity={0.4}
             />
             {(() => {
               const boxW = 52;
               const boxH = 22;
-              const boxY = 4;
+              const boxY = topPad + 4;
               const boxX = tooltipAnchor === "right"
                 ? tooltipX - boxW - 4
                 : tooltipX + 4;
@@ -183,7 +188,7 @@ function HistogramChart({
           <text
             key={s}
             x={bucketIdx(s) * (barW + gap)}
-            y={chartH + 10}
+            y={topPad + chartH + 10}
             fontFamily={font.sans} fontSize={4} fill={C.inkFaint}
           >
             {s}

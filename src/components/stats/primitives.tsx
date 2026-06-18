@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { C, font, eyebrow } from "./stats.tokens";
+import { C, font, eyebrow } from "../../styles/tokens";
 
 /* ─── Stat card shell ────────────────────────────── */
 export function StatCard({

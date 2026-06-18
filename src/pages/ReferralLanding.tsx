@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-
-const C = {
-  cream: "#faf9f5",
-  inkFaint: "#9A8E85",
-};
-
-const font = {
-  sans: "'Inter', ui-sans-serif, system-ui, sans-serif",
-};
+import { C, font } from "../styles/tokens";
 
 /* ─── Referral landing ───────────────────────────── */
 // Visiting /r/:userId credits the referrer with one "share click",
@@ -20,10 +12,7 @@ export default function ReferralLanding() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (!userId) {
-      setDone(true);
-      return;
-    }
+    if (!userId) return; // no userId in the URL — nothing to increment, fall through to redirect below
     (async () => {
       try {
         await supabase.rpc("increment_share_clicks", { p_user_id: userId });
@@ -35,7 +24,7 @@ export default function ReferralLanding() {
     })();
   }, [userId]);
 
-  if (done) return <Navigate to="/" replace />;
+  if (done || !userId) return <Navigate to="/" replace />;
 
   return (
     <div style={{
